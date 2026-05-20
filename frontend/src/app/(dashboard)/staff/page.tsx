@@ -1,0 +1,493 @@
+"use client";
+
+import { useState } from "react";
+import { motion } from "framer-motion";
+import {
+  Send, Paperclip, Bot, Shield,
+  AlertCircle, LayoutDashboard, ListTodo,
+  LogOut, Settings, Clock,
+} from "lucide-react";
+
+// ── CONSTANTS ──────────────────────────────────────────────────────────────
+const priorities = [
+  { value: "low",      label: "Low",      color: "#1A6B3C", bg: "#E8F5EE", desc: "Minor issue, not urgent" },
+  { value: "medium",   label: "Medium",   color: "#FF8C00", bg: "#FFF4E5", desc: "Affecting productivity" },
+  { value: "high",     label: "High",     color: "#CC0000", bg: "#FFE5E5", desc: "Significant disruption" },
+  { value: "critical", label: "Critical", color: "#7B0000", bg: "#FFD0D0", desc: "Complete loss of service" },
+];
+
+const departments = [
+  "Directorate of ICT",
+  "Directorate of Finance",
+  "Directorate of Administration",
+  "Directorate of Legal Services",
+  "Communications Unit",
+  "Office of the Cabinet Secretary",
+  "Human Resource Directorate",
+];
+
+const locations = [
+  "1st Floor - Boardroom",
+  "1st Floor - Reception",
+  "2nd Floor - Administration",
+  "3rd Floor - Finance",
+  "4th Floor - Legal",
+  "5th Floor - Executive",
+  "Server Room - Basement",
+];
+
+const navItems = [
+  { icon: LayoutDashboard, label: "Report Issue",   active: true  },
+  { icon: ListTodo,        label: "My Tickets",     active: false },
+  { icon: Clock,           label: "Ticket History", active: false },
+  { icon: Settings,        label: "Settings",       active: false },
+];
+
+// ── TYPES ──────────────────────────────────────────────────────────────────
+type AIMessage = { role: "user" | "ai"; text: string };
+type FormState = { title: string; description: string; priority: string; location: string; department: string };
+
+// ── SHARED STYLES ──────────────────────────────────────────────────────────
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "14px 18px",
+  borderRadius: 12,
+  border: "2px solid #E2E8F0",
+  fontSize: 14,
+  color: "#1E293B",
+  outline: "none",
+  fontFamily: "inherit",
+  transition: "border-color 0.2s",
+  backgroundColor: "white",
+};
+
+// ── SIDEBAR (shared between main and success screen) ───────────────────────
+function Sidebar() {
+  return (
+    <aside style={{
+      width: 240, minWidth: 240, display: "flex", flexDirection: "column",
+      height: "100%", backgroundColor: "#003399",
+    }}>
+      <div style={{ padding: 24, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <img src="/coat-of-arms.jpg" alt="OPCS" style={{ width: 40, height: 40, objectFit: "contain" }} />
+          <div>
+            <p style={{ color: "white", fontWeight: 800, fontSize: 14, lineHeight: 1.3 }}>OPCS eSupport</p>
+            <p style={{ color: "#93C5FD", fontSize: 11 }}>Staff Portal</p>
+          </div>
+        </div>
+      </div>
+
+      <nav style={{ flex: 1, padding: 16, display: "flex", flexDirection: "column", gap: 4 }}>
+        {navItems.map((item, i) => (
+          <button key={i} style={{
+            width: "100%", display: "flex", alignItems: "center", gap: 12,
+            padding: "12px 16px", borderRadius: 12, border: "none", cursor: "pointer",
+            backgroundColor: item.active ? "rgba(255,255,255,0.15)" : "transparent",
+            color: item.active ? "white" : "rgba(255,255,255,0.55)",
+            fontSize: 14, fontWeight: 600, textAlign: "left",
+          }}>
+            <item.icon size={18} />
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
+      <div style={{ padding: 16, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+            backgroundColor: "#FFCC00", color: "#003399",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontWeight: 900, fontSize: 14,
+          }}>S</div>
+          <div style={{ overflow: "hidden", flex: 1 }}>
+            <p style={{ color: "white", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              Staff Member
+            </p>
+            <p style={{ color: "#93C5FD", fontSize: 11 }}>OPCS Staff</p>
+          </div>
+          <LogOut size={16} color="#93C5FD" style={{ cursor: "pointer", flexShrink: 0 }} />
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+// ── MAIN COMPONENT ─────────────────────────────────────────────────────────
+export default function StaffPortal() {
+  const [form, setForm] = useState<FormState>({
+    title: "", description: "", priority: "medium", location: "", department: "",
+  });
+  const [aiQuery,    setAiQuery]    = useState("");
+  const [aiMessages, setAiMessages] = useState<AIMessage[]>([{
+    role: "ai",
+    text: "Hello! I am the OPCS IT Assistant. Describe your issue and I will try to help you resolve it before you submit a ticket.",
+  }]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [file,      setFile]      = useState<File | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [ticketRef, setTicketRef] = useState("");
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
+    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setTicketRef("TKT-" + Math.floor(Math.random() * 9000 + 1000));
+    setSubmitted(true);
+  }
+
+  async function handleAiSend() {
+    if (!aiQuery.trim()) return;
+    const userMsg = aiQuery.trim();
+    setAiMessages(prev => [...prev, { role: "user", text: userMsg }]);
+    setAiQuery("");
+    setAiLoading(true);
+    setTimeout(() => {
+      setAiMessages(prev => [...prev, {
+        role: "ai",
+        text: `For "${userMsg}", try restarting the device first. Check all cable connections and restart the relevant service. If the issue persists, submit a ticket and a technician will assist you.`,
+      }]);
+      setAiLoading(false);
+    }, 1500);
+  }
+
+  // ── SUCCESS SCREEN ──────────────────────────────────────────────────────
+  if (submitted) {
+    return (
+      <div style={{ display: "flex", height: "100vh", width: "100%", overflow: "hidden", backgroundColor: "#F5F7FA" }}>
+        <Sidebar />
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }}>
+          <motion.div
+            initial={{ scale: 0.85, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.5 }}
+            style={{
+              backgroundColor: "white", borderRadius: 20,
+              boxShadow: "0 8px 40px rgba(0,0,0,0.10)",
+              padding: 56, textAlign: "center", maxWidth: 460, width: "100%",
+            }}
+          >
+            <div style={{
+              width: 80, height: 80, borderRadius: "50%", backgroundColor: "#E8F5EE",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              margin: "0 auto 24px",
+            }}>
+              <AlertCircle size={40} color="#1A6B3C" />
+            </div>
+
+            <h2 style={{ fontSize: 26, fontWeight: 900, color: "#003399", marginBottom: 8 }}>
+              Ticket Submitted!
+            </h2>
+            <p style={{ color: "#64748B", fontSize: 15, marginBottom: 32 }}>
+              Your request has been received. An ICT technician will be assigned shortly.
+            </p>
+
+            <div style={{
+              padding: "20px 24px", borderRadius: 16, backgroundColor: "#EBF0FA", marginBottom: 28,
+            }}>
+              <p style={{ fontSize: 12, color: "#64748B", marginBottom: 6 }}>Your Reference Number</p>
+              <p style={{ fontSize: 34, fontWeight: 900, fontFamily: "monospace", color: "#003399" }}>
+                {ticketRef}
+              </p>
+              <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 6 }}>
+                Save this number to track your request status
+              </p>
+            </div>
+
+            <div style={{ width: 60, height: 5, borderRadius: 99, backgroundColor: "#FFCC00", margin: "0 auto 28px" }} />
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                setSubmitted(false);
+                setForm({ title: "", description: "", priority: "medium", location: "", department: "" });
+                setFile(null);
+              }}
+              style={{
+                width: "100%", padding: "16px 0", borderRadius: 12, border: "none",
+                backgroundColor: "#003399", color: "white",
+                fontSize: 16, fontWeight: 800, cursor: "pointer",
+              }}
+            >
+              Submit Another Issue
+            </motion.button>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── MAIN PORTAL ─────────────────────────────────────────────────────────
+  return (
+    <div style={{ display: "flex", height: "100vh", width: "100%", overflow: "hidden", backgroundColor: "#F5F7FA" }}>
+      <Sidebar />
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+        {/* Header */}
+        <header style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "16px 32px", backgroundColor: "white",
+          borderBottom: "1px solid #E2E8F0", flexShrink: 0,
+        }}>
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 900, color: "#003399" }}>Report an IT Issue</h1>
+            <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>
+              Fill in the form — a technician will be assigned to your request
+            </p>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Shield size={16} color="#EAB308" />
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#64748B" }}>Secure Platform</span>
+          </div>
+        </header>
+
+        {/* Gold accent */}
+        <div style={{ width: "100%", height: 4, backgroundColor: "#FFCC00", flexShrink: 0 }} />
+
+        {/* Scrollable content */}
+        <main style={{ flex: 1, overflowY: "auto", padding: 32 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 28, maxWidth: 1400, margin: "0 auto" }}>
+
+            {/* ── TICKET FORM ── */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+            >
+              <form onSubmit={handleSubmit} style={{
+                backgroundColor: "white", borderRadius: 16,
+                boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+                padding: 32, display: "flex", flexDirection: "column", gap: 22,
+              }}>
+
+                {/* Title */}
+                <div>
+                  <label style={labelStyle}>Issue Title *</label>
+                  <input
+                    name="title" value={form.title} onChange={handleChange}
+                    required type="text"
+                    placeholder="e.g. Printer not connecting to network"
+                    style={inputStyle}
+                    onFocus={e => (e.target.style.borderColor = "#003399")}
+                    onBlur={e  => (e.target.style.borderColor = "#E2E8F0")}
+                  />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label style={labelStyle}>Issue Description *</label>
+                  <textarea
+                    name="description" value={form.description} onChange={handleChange}
+                    required rows={5}
+                    placeholder="Describe the problem in detail. When did it start? What were you doing?"
+                    style={{ ...inputStyle, resize: "none" }}
+                    onFocus={e => (e.target.style.borderColor = "#003399")}
+                    onBlur={e  => (e.target.style.borderColor = "#E2E8F0")}
+                  />
+                </div>
+
+                {/* Department + Location */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  <div>
+                    <label style={labelStyle}>Department *</label>
+                    <select
+                      name="department" value={form.department} onChange={handleChange} required
+                      style={inputStyle}
+                      onFocus={e => (e.target.style.borderColor = "#003399")}
+                      onBlur={e  => (e.target.style.borderColor = "#E2E8F0")}
+                    >
+                      <option value="">Select department</option>
+                      {departments.map(d => <option key={d}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Office Location *</label>
+                    <select
+                      name="location" value={form.location} onChange={handleChange} required
+                      style={inputStyle}
+                      onFocus={e => (e.target.style.borderColor = "#003399")}
+                      onBlur={e  => (e.target.style.borderColor = "#E2E8F0")}
+                    >
+                      <option value="">Select location</option>
+                      {locations.map(l => <option key={l}>{l}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Priority */}
+                <div>
+                  <label style={labelStyle}>Priority Level *</label>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+                    {priorities.map(p => (
+                      <button
+                        key={p.value} type="button"
+                        onClick={() => setForm(prev => ({ ...prev, priority: p.value }))}
+                        style={{
+                          padding: "12px 14px", borderRadius: 12, cursor: "pointer",
+                          border: `2px solid ${form.priority === p.value ? p.color : "#E2E8F0"}`,
+                          backgroundColor: form.priority === p.value ? p.bg : "white",
+                          color: form.priority === p.value ? p.color : "#64748B",
+                          textAlign: "left", transition: "all 0.2s",
+                        }}
+                      >
+                        <div style={{ fontSize: 13, fontWeight: 800 }}>{p.label}</div>
+                        <div style={{ fontSize: 11, marginTop: 2, opacity: 0.75 }}>{p.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* File attachment */}
+                <div>
+                  <label style={labelStyle}>Attach Screenshot (Optional)</label>
+                  <label style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    padding: "14px 18px", borderRadius: 12,
+                    border: "2px dashed #003399", backgroundColor: "#EBF0FA",
+                    cursor: "pointer",
+                  }}>
+                    <Paperclip size={18} color="#003399" />
+                    <span style={{ fontSize: 14, fontWeight: 600, color: "#003399" }}>
+                      {file ? file.name : "Click to upload a screenshot or file"}
+                    </span>
+                    <input
+                      type="file" style={{ display: "none" }} accept="image/*,.pdf"
+                      onChange={e => setFile(e.target.files?.[0] || null)}
+                    />
+                  </label>
+                </div>
+
+                {/* Submit */}
+                <motion.button
+                  whileHover={{ scale: 1.02, boxShadow: "0 8px 28px rgba(0,51,153,0.35)" }}
+                  whileTap={{ scale: 0.98 }}
+                  type="submit"
+                  style={{
+                    width: "100%", padding: "16px 0", borderRadius: 12, border: "none",
+                    backgroundColor: "#003399", color: "white",
+                    fontSize: 16, fontWeight: 800, cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                  }}
+                >
+                  <Send size={18} />
+                  Submit IT Support Request
+                </motion.button>
+
+                {/* Gold accent */}
+                <div style={{ width: "100%", height: 5, borderRadius: 99, backgroundColor: "#FFCC00" }} />
+              </form>
+            </motion.div>
+
+            {/* ── AI ASSISTANT ── */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, delay: 0.15 }}
+            >
+              <div style={{
+                backgroundColor: "white", borderRadius: 16,
+                boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+                overflow: "hidden", position: "sticky", top: 0,
+              }}>
+                {/* AI header */}
+                <div style={{
+                  padding: "18px 20px", backgroundColor: "#003399",
+                  display: "flex", alignItems: "center", gap: 12,
+                }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
+                    backgroundColor: "#FFCC00",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <Bot size={20} color="#003399" />
+                  </div>
+                  <div>
+                    <p style={{ color: "white", fontWeight: 800, fontSize: 14 }}>OPCS IT Assistant</p>
+                    <p style={{ color: "#93C5FD", fontSize: 11 }}>Powered by Claude AI</p>
+                  </div>
+                </div>
+
+                {/* Chat messages */}
+                <div style={{ padding: 16, height: 340, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+                  {aiMessages.map((msg, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}
+                    >
+                      <div style={{
+                        maxWidth: "85%", padding: "10px 14px", borderRadius: 12,
+                        fontSize: 13, lineHeight: 1.6,
+                        backgroundColor: msg.role === "user" ? "#003399" : "#EBF0FA",
+                        color: msg.role === "user" ? "white" : "#1E293B",
+                      }}>
+                        {msg.text}
+                      </div>
+                    </motion.div>
+                  ))}
+                  {aiLoading && (
+                    <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                      <div style={{
+                        padding: "10px 14px", borderRadius: 12,
+                        backgroundColor: "#EBF0FA", color: "#64748B", fontSize: 13,
+                      }}>
+                        Thinking...
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* AI input */}
+                <div style={{ padding: 16, borderTop: "1px solid #F1F5F9" }}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      value={aiQuery}
+                      onChange={e => setAiQuery(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && handleAiSend()}
+                      placeholder="Ask about your issue..."
+                      style={{ ...inputStyle, flex: 1, padding: "10px 14px", fontSize: 13 }}
+                      onFocus={e => (e.target.style.borderColor = "#003399")}
+                      onBlur={e  => (e.target.style.borderColor = "#E2E8F0")}
+                    />
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleAiSend}
+                      style={{
+                        padding: "10px 14px", borderRadius: 10, border: "none",
+                        backgroundColor: "#003399", color: "white",
+                        cursor: "pointer", flexShrink: 0,
+                        display: "flex", alignItems: "center",
+                      }}
+                    >
+                      <Send size={15} />
+                    </motion.button>
+                  </div>
+                  <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 8, textAlign: "center" }}>
+                    Try AI first before submitting a ticket
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+// Shared label style
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  fontSize: 13,
+  fontWeight: 700,
+  color: "#1E293B",
+  marginBottom: 8,
+};
