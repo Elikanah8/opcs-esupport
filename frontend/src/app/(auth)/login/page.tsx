@@ -1,111 +1,154 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, Shield, Monitor, Users, UserCheck } from "lucide-react";
+import { Eye, EyeOff, Shield, Monitor } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useAuthStore, mockUsers } from "@/store/authStore";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState<"staff" | "intern">("staff");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleSignIn(e: React.FormEvent) {
+  // Login form state
+  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
+
+  // Signup form state
+  const [signupForm, setSignupForm] = useState({
+    name: "", email: "", department: "", password: ""
+  });
+
+  // Auth store and router
+  const { login } = useAuthStore();
+  const router = useRouter();
+
+  // Handle login form submission
+  function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    router.push(role === "intern" ? "/intern" : "/staff");
+    setError("");
+    setLoading(true);
+
+    // Simulate network delay
+    setTimeout(() => {
+      // Find user in mock data — will be replaced by real API call
+      const user = mockUsers.find(
+        u => u.email === loginForm.email && u.password === loginForm.password
+      );
+
+      if (!user) {
+        setError("Invalid email or password. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      // Log the user in and store in global state
+      login({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+      });
+
+      // Redirect based on role
+      if (user.role === "intern")      router.push("/intern");
+      if (user.role === "staff")       router.push("/staff");
+      if (user.role === "supervisor")  router.push("/supervisor");
+
+      setLoading(false);
+    }, 800);
+  }
+
+  // Handle signup form submission
+  function handleSignup(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    // Simulate account creation — will be replaced by real API
+    setTimeout(() => {
+      // After signup, default new users to staff role
+      login({
+        id: Date.now().toString(),
+        name: signupForm.name,
+        email: signupForm.email,
+        role: "staff",
+        department: signupForm.department,
+      });
+
+      router.push("/staff");
+      setLoading(false);
+    }, 800);
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        width: "100%",
-        display: "flex",
-        backgroundColor: "#003399",
-      }}
-    >
-      {/* ── LEFT BRANDING PANEL ── */}
+    <div style={{ display: "flex", width: "100%", minHeight: "100vh", backgroundColor: "#003399" }}>
+
+      {/* ---- LEFT BRANDING PANEL ---- */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.8 }}
-        style={{
-          width: "50%",
-          minWidth: 420,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "64px",
-          backgroundColor: "#003399",
-        }}
+        style={{ width: "50%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", padding: 64, backgroundColor: "#003399" }}
       >
-        {/* Top — Coat of Arms + Title */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", marginTop: 48 }}>
+        <div className="flex flex-col items-center text-center mt-16">
           <motion.img
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.3, duration: 0.6 }}
             src="/coat-of-arms.jpg"
             alt="Kenya Coat of Arms"
-            style={{ width: 180, height: 180, objectFit: "contain", marginBottom: 36, filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.4))" }}
+            className="w-48 h-48 object-contain mb-10 drop-shadow-2xl"
           />
-
-          <h1 style={{ color: "white", fontSize: 36, fontWeight: 900, lineHeight: 1.2, marginBottom: 12 }}>
+          <h1 className="text-white text-4xl font-extrabold leading-tight mb-4">
             Office of the Prime<br />Cabinet Secretary
           </h1>
-
-          <p style={{ color: "#93C5FD", fontSize: 18, marginBottom: 20 }}>Republic of Kenya</p>
-
-          {/* Gold divider */}
-          <div style={{ width: 120, height: 5, borderRadius: 99, backgroundColor: "#FFCC00", marginBottom: 28 }} />
-
-          <p style={{ color: "#BFDBFE", fontSize: 15, lineHeight: 1.7, maxWidth: 300 }}>
+          <p className="text-blue-200 text-xl mb-6">Republic of Kenya</p>
+          <div className="w-32 h-1.5 rounded-full mb-8" style={{ backgroundColor: "#FFCC00" }} />
+          <p className="text-blue-200 text-base leading-relaxed max-w-xs">
             Centralized IT Incident Management and Support Platform for OPCS Staff
           </p>
         </div>
 
-        {/* Bottom branding */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, marginBottom: 24 }}>
-          <div style={{
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "8px 18px", borderRadius: 99,
-            backgroundColor: "rgba(255,255,255,0.1)",
-          }}>
-            <Shield size={15} color="#FACC15" />
-            <span style={{ color: "#DBEAFE", fontSize: 13, fontWeight: 600 }}>Secure Government Platform</span>
+        <div className="flex flex-col items-center gap-4 mb-8">
+          <div
+            className="flex items-center gap-2 px-4 py-2 rounded-full"
+            style={{ backgroundColor: "rgba(255,255,255,0.1)" }}
+          >
+            <Shield size={16} className="text-yellow-400" />
+            <span className="text-blue-100 text-sm font-medium">Secure Government Platform</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <Monitor size={13} color="#93C5FD" />
-            <span style={{ color: "#93C5FD", fontSize: 12 }}>OPCS eSupport v1.0 — May 2026</span>
+          <div className="flex items-center gap-2">
+            <Monitor size={14} className="text-blue-300" />
+            <span className="text-blue-300 text-xs">OPCS eSupport v1.0 — May 2026</span>
           </div>
         </div>
       </motion.div>
 
-      {/* ── RIGHT FORM PANEL ── */}
+      {/* ---- RIGHT FORM PANEL ---- */}
       <motion.div
         initial={{ x: 60, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ duration: 0.6 }}
-        style={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "48px 64px",
-          backgroundColor: "#F5F7FA",
-          overflowY: "auto",
-        }}
+        className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-16"
+        style={{ backgroundColor: "#F5F7FA" }}
       >
-        <div style={{ width: "100%", maxWidth: 520 }}>
+        <div className="w-full max-w-lg">
 
-          {/* Heading */}
-          <div style={{ marginBottom: 36 }}>
-            <h2 style={{ fontSize: 38, fontWeight: 900, color: "#003399", marginBottom: 8 }}>
+          {/* Mobile header */}
+          <div className="flex flex-col items-center mb-10 lg:hidden">
+            <img src="/coat-of-arms.jpg" alt="Coat of Arms" className="w-24 h-24 object-contain mb-4" />
+            <h1 className="text-2xl font-extrabold" style={{ color: "#003399" }}>OPCS eSupport</h1>
+          </div>
+
+          {/* Page heading */}
+          <div className="mb-10">
+            <h2 className="text-4xl font-extrabold mb-2" style={{ color: "#003399" }}>
               {activeTab === "login" ? "Welcome back" : "Get started"}
             </h2>
-            <p style={{ color: "#64748B", fontSize: 15 }}>
+            <p className="text-gray-500 text-base">
               {activeTab === "login"
                 ? "Sign in to your OPCS eSupport account"
                 : "Create your account in under 30 seconds"}
@@ -113,23 +156,16 @@ export default function LoginPage() {
           </div>
 
           {/* Tab switcher */}
-          <div style={{ display: "flex", backgroundColor: "#E2E8F0", borderRadius: 14, padding: 6, marginBottom: 36 }}>
-            {(["login", "signup"] as const).map(tab => (
+          <div className="flex mb-10 rounded-xl p-1.5" style={{ backgroundColor: "#E2E8F0" }}>
+            {["login", "signup"].map(tab => (
               <button
                 key={tab}
-                onClick={() => setActiveTab(tab)}
+                onClick={() => { setActiveTab(tab as "login" | "signup"); setError(""); }}
+                className="flex-1 py-3 rounded-lg text-base font-semibold transition-all duration-300"
                 style={{
-                  flex: 1,
-                  padding: "12px 0",
-                  borderRadius: 10,
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: 15,
-                  fontWeight: 700,
-                  transition: "all 0.25s",
                   backgroundColor: activeTab === tab ? "#003399" : "transparent",
                   color: activeTab === tab ? "white" : "#64748B",
-                  boxShadow: activeTab === tab ? "0 4px 14px rgba(0,51,153,0.3)" : "none",
+                  boxShadow: activeTab === tab ? "0 4px 12px rgba(0,51,153,0.3)" : "none",
                 }}
               >
                 {tab === "login" ? "Sign In" : "Create Account"}
@@ -138,89 +174,132 @@ export default function LoginPage() {
           </div>
 
           {/* Form card */}
-          <div style={{
-            backgroundColor: "white",
-            borderRadius: 20,
-            boxShadow: "0 8px 40px rgba(0,0,0,0.10)",
-            padding: 40,
-          }}>
-            <form onSubmit={handleSignIn}>
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                style={{ display: "flex", flexDirection: "column", gap: 22 }}
-              >
+          <div className="bg-white rounded-2xl shadow-xl p-10">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
 
-                {/* Role selector */}
-                <div>
-                  <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#1E293B", marginBottom: 8 }}>
-                    I am a
-                  </label>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    {(["staff", "intern"] as const).map(r => (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => setRole(r)}
-                        style={{
-                          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                          padding: "12px 16px",
-                          borderRadius: 12,
-                          border: `2px solid ${role === r ? "#003399" : "#E2E8F0"}`,
-                          backgroundColor: role === r ? "#EBF0FA" : "white",
-                          color: role === r ? "#003399" : "#64748B",
-                          fontSize: 14, fontWeight: 700,
-                          cursor: "pointer",
-                          transition: "all 0.2s",
-                        }}
-                      >
-                        {r === "staff" ? <Users size={15} /> : <UserCheck size={15} />}
-                        {r === "staff" ? "Staff Member" : "IT Intern"}
-                      </button>
-                    ))}
-                  </div>
+              {/* Error message */}
+              {error && (
+                <div
+                  className="px-4 py-3 rounded-xl mb-6 text-sm font-medium"
+                  style={{ backgroundColor: "#FFE5E5", color: "#CC0000" }}
+                >
+                  {error}
                 </div>
+              )}
 
-                {/* Full name — signup only */}
-                {activeTab === "signup" && (
+              {/* LOGIN FORM */}
+              {activeTab === "login" && (
+                <form onSubmit={handleLogin} className="space-y-6">
                   <div>
-                    <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#1E293B", marginBottom: 8 }}>
-                      Full Name
+                    <label className="block text-sm font-semibold mb-2" style={{ color: "#1E293B" }}>
+                      OPCS Email Address
                     </label>
                     <input
-                      type="text"
-                      placeholder="e.g. Elikanah Njuru"
-                      style={inputStyle}
+                      type="email"
+                      required
+                      placeholder="yourname@opcs.go.ke"
+                      value={loginForm.email}
+                      onChange={e => setLoginForm(prev => ({ ...prev, email: e.target.value }))}
+                      className="w-full px-5 py-4 rounded-xl border-2 text-base transition-all outline-none"
+                      style={{ borderColor: "#E2E8F0", color: "#1E293B" }}
                       onFocus={e => (e.target.style.borderColor = "#003399")}
                       onBlur={e  => (e.target.style.borderColor = "#E2E8F0")}
                     />
                   </div>
-                )}
 
-                {/* Email */}
-                <div>
-                  <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#1E293B", marginBottom: 8 }}>
-                    OPCS Email Address
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="yourname@opcs.go.ke"
-                    style={inputStyle}
-                    onFocus={e => (e.target.style.borderColor = "#003399")}
-                    onBlur={e  => (e.target.style.borderColor = "#E2E8F0")}
-                  />
-                </div>
-
-                {/* Department — signup only */}
-                {activeTab === "signup" && (
                   <div>
-                    <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#1E293B", marginBottom: 8 }}>
+                    <label className="block text-sm font-semibold mb-2" style={{ color: "#1E293B" }}>
+                      Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        placeholder="Enter your password"
+                        value={loginForm.password}
+                        onChange={e => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
+                        className="w-full px-5 py-4 rounded-xl border-2 text-base transition-all outline-none pr-14"
+                        style={{ borderColor: "#E2E8F0", color: "#1E293B" }}
+                        onFocus={e => (e.target.style.borderColor = "#003399")}
+                        onBlur={e  => (e.target.style.borderColor = "#E2E8F0")}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
+                      >
+                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                      </button>
+                    </div>
+                  </div>
+
+
+
+                  <motion.button
+                    whileHover={{ scale: 1.02, boxShadow: "0 8px 25px rgba(0,51,153,0.4)" }}
+                    whileTap={{ scale: 0.98 }}
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-4 rounded-xl text-white text-base font-bold transition-all"
+                    style={{ backgroundColor: loading ? "#6B93CC" : "#003399" }}
+                  >
+                    {loading ? "Signing in..." : "Sign In to OPCS eSupport"}
+                  </motion.button>
+                </form>
+              )}
+
+              {/* SIGNUP FORM */}
+              {activeTab === "signup" && (
+                <form onSubmit={handleSignup} className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-semibold mb-2" style={{ color: "#1E293B" }}>
+                      Full Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Elikanah Njuru"
+                      value={signupForm.name}
+                      onChange={e => setSignupForm(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full px-5 py-4 rounded-xl border-2 text-base transition-all outline-none"
+                      style={{ borderColor: "#E2E8F0", color: "#1E293B" }}
+                      onFocus={e => (e.target.style.borderColor = "#003399")}
+                      onBlur={e  => (e.target.style.borderColor = "#E2E8F0")}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-2" style={{ color: "#1E293B" }}>
+                      OPCS Email Address
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="yourname@opcs.go.ke"
+                      value={signupForm.email}
+                      onChange={e => setSignupForm(prev => ({ ...prev, email: e.target.value }))}
+                      className="w-full px-5 py-4 rounded-xl border-2 text-base transition-all outline-none"
+                      style={{ borderColor: "#E2E8F0", color: "#1E293B" }}
+                      onFocus={e => (e.target.style.borderColor = "#003399")}
+                      onBlur={e  => (e.target.style.borderColor = "#E2E8F0")}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-2" style={{ color: "#1E293B" }}>
                       Department
                     </label>
                     <select
-                      style={{ ...inputStyle, backgroundColor: "white" }}
+                      required
+                      value={signupForm.department}
+                      onChange={e => setSignupForm(prev => ({ ...prev, department: e.target.value }))}
+                      className="w-full px-5 py-4 rounded-xl border-2 text-base outline-none bg-white"
+                      style={{ borderColor: "#E2E8F0", color: "#1E293B" }}
                       onFocus={e => (e.target.style.borderColor = "#003399")}
                       onBlur={e  => (e.target.style.borderColor = "#E2E8F0")}
                     >
@@ -232,59 +311,53 @@ export default function LoginPage() {
                       <option>Communications Unit</option>
                     </select>
                   </div>
-                )}
 
-                {/* Password */}
-                <div>
-                  <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#1E293B", marginBottom: 8 }}>
-                    Password
-                  </label>
-                  <div style={{ position: "relative" }}>
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      placeholder={activeTab === "login" ? "Enter your password" : "Create a strong password"}
-                      style={{ ...inputStyle, paddingRight: 52 }}
-                      onFocus={e => (e.target.style.borderColor = "#003399")}
-                      onBlur={e  => (e.target.style.borderColor = "#E2E8F0")}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      style={{
-                        position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",
-                        background: "none", border: "none", cursor: "pointer", color: "#94A3B8",
-                        display: "flex", alignItems: "center",
-                      }}
-                    >
-                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                    </button>
+                  <div>
+                    <label className="block text-sm font-semibold mb-2" style={{ color: "#1E293B" }}>
+                      Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        placeholder="Create a strong password"
+                        value={signupForm.password}
+                        onChange={e => setSignupForm(prev => ({ ...prev, password: e.target.value }))}
+                        className="w-full px-5 py-4 rounded-xl border-2 text-base transition-all outline-none pr-14"
+                        style={{ borderColor: "#E2E8F0", color: "#1E293B" }}
+                        onFocus={e => (e.target.style.borderColor = "#003399")}
+                        onBlur={e  => (e.target.style.borderColor = "#E2E8F0")}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
+                      >
+                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                {/* Submit */}
-                <motion.button
-                  whileHover={{ scale: 1.02, boxShadow: "0 8px 28px rgba(0,51,153,0.4)" }}
-                  whileTap={{ scale: 0.98 }}
-                  type="submit"
-                  style={{
-                    width: "100%", padding: "16px 0",
-                    borderRadius: 12, border: "none",
-                    backgroundColor: "#003399", color: "white",
-                    fontSize: 16, fontWeight: 800,
-                    cursor: "pointer", marginTop: 4,
-                  }}
-                >
-                  {activeTab === "login" ? "Sign In to OPCS eSupport" : "Create My Account"}
-                </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02, boxShadow: "0 8px 25px rgba(0,51,153,0.4)" }}
+                    whileTap={{ scale: 0.98 }}
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-4 rounded-xl text-white text-base font-bold transition-all"
+                    style={{ backgroundColor: loading ? "#6B93CC" : "#003399" }}
+                  >
+                    {loading ? "Creating account..." : "Create My Account"}
+                  </motion.button>
+                </form>
+              )}
 
-              </motion.div>
-            </form>
+            </motion.div>
 
-            {/* Gold accent */}
-            <div style={{ width: "100%", height: 5, borderRadius: 99, backgroundColor: "#FFCC00", marginTop: 28 }} />
+            {/* Gold bottom accent */}
+            <div className="w-full h-1.5 rounded-full mt-8" style={{ backgroundColor: "#FFCC00" }} />
           </div>
 
-          <p style={{ textAlign: "center", fontSize: 12, color: "#94A3B8", marginTop: 28 }}>
+          <p className="text-center text-sm text-gray-400 mt-8">
             © 2026 Office of the Prime Cabinet Secretary, Republic of Kenya
           </p>
         </div>
@@ -292,16 +365,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-// Shared input style
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "14px 20px",
-  borderRadius: 12,
-  border: "2px solid #E2E8F0",
-  fontSize: 15,
-  color: "#1E293B",
-  outline: "none",
-  transition: "border-color 0.2s",
-  fontFamily: "inherit",
-};
