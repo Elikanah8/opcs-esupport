@@ -5,12 +5,13 @@ import { motion } from "framer-motion";
 import {
   TicketIcon, CheckCircle, AlertTriangle, Clock,
   LogOut, Bell, Wifi, LayoutDashboard,
-  ListTodo, Settings, MapPin, User,
+  ListTodo, Settings, MapPin, User, Bot, Send,
 } from "lucide-react";
 
 // ── TYPES ──────────────────────────────────────────────────────────────────
 type Priority = "low" | "medium" | "high" | "critical";
 type Status   = "submitted" | "claimed" | "in_progress" | "awaiting" | "resolved";
+type AIMessage = { role: "user" | "ai"; text: string };
 
 type TicketItem = {
   id: string;
@@ -72,11 +73,32 @@ const navItems = [
   { icon: Settings,        label: "Settings",   active: false },
 ];
 
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "14px 18px",
+  borderRadius: 12,
+  border: "2px solid #E2E8F0",
+  fontSize: 14,
+  color: "#1E293B",
+  outline: "none",
+  fontFamily: "inherit",
+  transition: "border-color 0.2s",
+  backgroundColor: "white",
+};
+
 // ── COMPONENT ──────────────────────────────────────────────────────────────
 export default function InternDashboard() {
   const [tickets, setTickets]     = useState<TicketItem[]>(mockTickets);
   const [activeTab, setActiveTab] = useState<"all" | "mine" | "resolved">("all");
   const [notifOpen, setNotifOpen] = useState(false);
+
+  // AI Assistant States
+  const [aiQuery,    setAiQuery]    = useState("");
+  const [aiMessages, setAiMessages] = useState<AIMessage[]>([{
+    role: "ai",
+    text: "Hello! I am the OPCS IT Assistant. Describe the issue or query you have, and I will search our system and guide you.",
+  }]);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const openCount     = tickets.filter(t => t.status === "submitted").length;
   const claimedCount  = tickets.filter(t => t.claimedBy === "You").length;
@@ -88,6 +110,46 @@ export default function InternDashboard() {
   }
   function resolveTicket(id: string) {
     setTickets(prev => prev.map(t => t.id === id ? { ...t, status: "resolved" } : t));
+  }
+
+  async function handleAiSend() {
+    if (!aiQuery.trim()) return;
+    const userMsg = aiQuery.trim();
+
+    // Add user message to chat immediately
+    setAiMessages(prev => [...prev, { role: "user", text: userMsg }]);
+    setAiQuery("");
+    setAiLoading(true);
+
+    try {
+      // Call our Next.js API route which connects to Grok
+      const response = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userMsg }),
+      });
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      // Add AI response to chat
+      setAiMessages(prev => [...prev, {
+        role: "ai",
+        text: data.reply,
+      }]);
+
+    } catch (error) {
+      // Show error message in chat if API call fails
+      setAiMessages(prev => [...prev, {
+        role: "ai",
+        text: "I am currently unavailable. Please try again or submit a ticket directly.",
+      }]);
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   const filteredTickets = tickets.filter(t => {
@@ -278,164 +340,263 @@ export default function InternDashboard() {
             ))}
           </div>
 
-          {/* Ticket table card */}
-          <div style={{
-            backgroundColor: "white", borderRadius: 16,
-            boxShadow: "0 2px 12px rgba(0,0,0,0.06)", overflow: "hidden",
-          }}>
-            {/* Table header */}
-            <div style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "18px 24px", borderBottom: "1px solid #F1F5F9",
-            }}>
-              <h2 style={{ fontWeight: 900, fontSize: 16, color: "#003399" }}>Support Tickets</h2>
+          {/* Two-column Layout: Ticket Table & AI Assistant */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 28, maxWidth: 1400, margin: "0 auto", alignItems: "start" }}>
 
-              <div style={{ display: "flex", gap: 8 }}>
-                {[
-                  { key: "all",      label: "All Open" },
-                  { key: "mine",     label: "My Tickets" },
-                  { key: "resolved", label: "Resolved" },
-                ].map(tab => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key as "all" | "mine" | "resolved")}
-                    style={{
-                      padding: "6px 16px", borderRadius: 8, border: "none", cursor: "pointer",
-                      backgroundColor: activeTab === tab.key ? "#003399" : "#F1F5F9",
-                      color: activeTab === tab.key ? "white" : "#64748B",
-                      fontSize: 12, fontWeight: 700,
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
+            {/* Ticket table card */}
+            <div style={{
+              backgroundColor: "white", borderRadius: 16,
+              boxShadow: "0 2px 12px rgba(0,0,0,0.06)", overflow: "hidden",
+            }}>
+              {/* Table header */}
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "18px 24px", borderBottom: "1px solid #F1F5F9",
+              }}>
+                <h2 style={{ fontWeight: 900, fontSize: 16, color: "#003399" }}>Support Tickets</h2>
+
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[
+                    { key: "all",      label: "All Open" },
+                    { key: "mine",     label: "My Tickets" },
+                    { key: "resolved", label: "Resolved" },
+                  ].map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key as "all" | "mine" | "resolved")}
+                      style={{
+                        padding: "6px 16px", borderRadius: 8, border: "none", cursor: "pointer",
+                        backgroundColor: activeTab === tab.key ? "#003399" : "#F1F5F9",
+                        color: activeTab === tab.key ? "white" : "#64748B",
+                        fontSize: 12, fontWeight: 700,
+                        transition: "all 0.2s",
+                      }}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Table */}
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ backgroundColor: "#F8FAFC" }}>
+                      {["Reference", "Title", "Location", "Submitted By", "Priority", "Status", "Actions"].map(h => (
+                        <th key={h} style={{
+                          textAlign: "left", padding: "12px 20px",
+                          fontSize: 11, fontWeight: 800, color: "#94A3B8",
+                          textTransform: "uppercase", letterSpacing: "0.06em",
+                        }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTickets.length === 0 && (
+                      <tr>
+                        <td colSpan={7} style={{ padding: "48px 24px", textAlign: "center", color: "#94A3B8", fontSize: 14 }}>
+                          No tickets in this category.
+                        </td>
+                      </tr>
+                    )}
+
+                    {filteredTickets.map((ticket, i) => (
+                      <motion.tr
+                        key={ticket.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: i * 0.05 }}
+                        style={{ borderTop: "1px solid #F1F5F9", transition: "background 0.15s" }}
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#F8FBFF")}
+                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+                      >
+                        <td style={{ padding: "16px 20px" }}>
+                          <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 800, color: "#003399" }}>
+                            {ticket.reference}
+                          </span>
+                        </td>
+                        <td style={{ padding: "16px 20px", maxWidth: 240 }}>
+                          <p style={{ fontWeight: 700, fontSize: 13, color: "#1E293B", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {ticket.title}
+                          </p>
+                          <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {ticket.description}
+                          </p>
+                        </td>
+                        <td style={{ padding: "16px 20px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <MapPin size={12} color="#94A3B8" />
+                            <span style={{ fontSize: 13, color: "#475569" }}>{ticket.location}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: "16px 20px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <User size={12} color="#94A3B8" />
+                            <span style={{ fontSize: 13, color: "#475569" }}>{ticket.submittedBy}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: "16px 20px" }}>
+                          <span style={{
+                            padding: "4px 12px", borderRadius: 99, fontSize: 11, fontWeight: 800,
+                            backgroundColor: priorityStyle[ticket.priority].bg,
+                            color: priorityStyle[ticket.priority].color,
+                          }}>
+                            {priorityStyle[ticket.priority].label}
+                          </span>
+                        </td>
+                        <td style={{ padding: "16px 20px" }}>
+                          <span style={{
+                            padding: "4px 12px", borderRadius: 99, fontSize: 11, fontWeight: 800,
+                            backgroundColor: statusStyle[ticket.status].bg,
+                            color: statusStyle[ticket.status].color,
+                          }}>
+                            {statusStyle[ticket.status].label}
+                          </span>
+                        </td>
+                        <td style={{ padding: "16px 20px" }}>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            {ticket.status === "submitted" && (
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => claimTicket(ticket.id)}
+                                style={{
+                                  padding: "6px 16px", borderRadius: 8, border: "none",
+                                  backgroundColor: "#003399", color: "white",
+                                  fontSize: 12, fontWeight: 800, cursor: "pointer",
+                                }}
+                              >Claim</motion.button>
+                            )}
+                            {ticket.claimedBy === "You" && ticket.status !== "resolved" && (
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => resolveTicket(ticket.id)}
+                                style={{
+                                  padding: "6px 16px", borderRadius: 8, border: "none",
+                                  backgroundColor: "#1A6B3C", color: "white",
+                                  fontSize: 12, fontWeight: 800, cursor: "pointer",
+                                }}
+                              >Resolve</motion.button>
+                            )}
+                            {ticket.claimedBy && ticket.claimedBy !== "You" && (
+                              <span style={{
+                                padding: "6px 16px", borderRadius: 8,
+                                backgroundColor: "#F1F5F9", color: "#94A3B8",
+                                fontSize: 12, fontWeight: 700,
+                              }}>Taken</span>
+                            )}
+                            {ticket.status === "resolved" && (
+                              <span style={{
+                                padding: "6px 16px", borderRadius: 8,
+                                backgroundColor: "#E8F5EE", color: "#1A6B3C",
+                                fontSize: 12, fontWeight: 700,
+                              }}>Closed</span>
+                            )}
+                          </div>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
 
-            {/* Table */}
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ backgroundColor: "#F8FAFC" }}>
-                    {["Reference", "Title", "Location", "Submitted By", "Priority", "Status", "Actions"].map(h => (
-                      <th key={h} style={{
-                        textAlign: "left", padding: "12px 20px",
-                        fontSize: 11, fontWeight: 800, color: "#94A3B8",
-                        textTransform: "uppercase", letterSpacing: "0.06em",
-                      }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTickets.length === 0 && (
-                    <tr>
-                      <td colSpan={7} style={{ padding: "48px 24px", textAlign: "center", color: "#94A3B8", fontSize: 14 }}>
-                        No tickets in this category.
-                      </td>
-                    </tr>
-                  )}
+            {/* ── AI ASSISTANT sidebar ── */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, delay: 0.15 }}
+              style={{ width: "100%" }}
+            >
+              <div style={{
+                backgroundColor: "white", borderRadius: 16,
+                boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+                overflow: "hidden", position: "sticky", top: 0,
+              }}>
+                {/* AI header */}
+                <div style={{
+                  padding: "18px 20px", backgroundColor: "#003399",
+                  display: "flex", alignItems: "center", gap: 12,
+                }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
+                    backgroundColor: "#FFCC00",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <Bot size={20} color="#003399" />
+                  </div>
+                  <div>
+                    <p style={{ color: "white", fontWeight: 800, fontSize: 14 }}>OPCS IT Assistant</p>
+                    <p style={{ color: "#93C5FD", fontSize: 11 }}>Powered by Grok AI</p>
+                  </div>
+                </div>
 
-                  {filteredTickets.map((ticket, i) => (
-                    <motion.tr
-                      key={ticket.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: i * 0.05 }}
-                      style={{ borderTop: "1px solid #F1F5F9", transition: "background 0.15s" }}
-                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#F8FBFF")}
-                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+                {/* Chat messages */}
+                <div style={{ padding: 16, height: 340, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+                  {aiMessages.map((msg, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}
                     >
-                      <td style={{ padding: "16px 20px" }}>
-                        <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 800, color: "#003399" }}>
-                          {ticket.reference}
-                        </span>
-                      </td>
-                      <td style={{ padding: "16px 20px", maxWidth: 240 }}>
-                        <p style={{ fontWeight: 700, fontSize: 13, color: "#1E293B", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {ticket.title}
-                        </p>
-                        <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {ticket.description}
-                        </p>
-                      </td>
-                      <td style={{ padding: "16px 20px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                          <MapPin size={12} color="#94A3B8" />
-                          <span style={{ fontSize: 13, color: "#475569" }}>{ticket.location}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: "16px 20px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                          <User size={12} color="#94A3B8" />
-                          <span style={{ fontSize: 13, color: "#475569" }}>{ticket.submittedBy}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: "16px 20px" }}>
-                        <span style={{
-                          padding: "4px 12px", borderRadius: 99, fontSize: 11, fontWeight: 800,
-                          backgroundColor: priorityStyle[ticket.priority].bg,
-                          color: priorityStyle[ticket.priority].color,
-                        }}>
-                          {priorityStyle[ticket.priority].label}
-                        </span>
-                      </td>
-                      <td style={{ padding: "16px 20px" }}>
-                        <span style={{
-                          padding: "4px 12px", borderRadius: 99, fontSize: 11, fontWeight: 800,
-                          backgroundColor: statusStyle[ticket.status].bg,
-                          color: statusStyle[ticket.status].color,
-                        }}>
-                          {statusStyle[ticket.status].label}
-                        </span>
-                      </td>
-                      <td style={{ padding: "16px 20px" }}>
-                        <div style={{ display: "flex", gap: 8 }}>
-                          {ticket.status === "submitted" && (
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => claimTicket(ticket.id)}
-                              style={{
-                                padding: "6px 16px", borderRadius: 8, border: "none",
-                                backgroundColor: "#003399", color: "white",
-                                fontSize: 12, fontWeight: 800, cursor: "pointer",
-                              }}
-                            >Claim</motion.button>
-                          )}
-                          {ticket.claimedBy === "You" && ticket.status !== "resolved" && (
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => resolveTicket(ticket.id)}
-                              style={{
-                                padding: "6px 16px", borderRadius: 8, border: "none",
-                                backgroundColor: "#1A6B3C", color: "white",
-                                fontSize: 12, fontWeight: 800, cursor: "pointer",
-                              }}
-                            >Resolve</motion.button>
-                          )}
-                          {ticket.claimedBy && ticket.claimedBy !== "You" && (
-                            <span style={{
-                              padding: "6px 16px", borderRadius: 8,
-                              backgroundColor: "#F1F5F9", color: "#94A3B8",
-                              fontSize: 12, fontWeight: 700,
-                            }}>Taken</span>
-                          )}
-                          {ticket.status === "resolved" && (
-                            <span style={{
-                              padding: "6px 16px", borderRadius: 8,
-                              backgroundColor: "#E8F5EE", color: "#1A6B3C",
-                              fontSize: 12, fontWeight: 700,
-                            }}>Closed</span>
-                          )}
-                        </div>
-                      </td>
-                    </motion.tr>
+                      <div style={{
+                        maxWidth: "85%", padding: "10px 14px", borderRadius: 12,
+                        fontSize: 13, lineHeight: 1.6,
+                        backgroundColor: msg.role === "user" ? "#003399" : "#EBF0FA",
+                        color: msg.role === "user" ? "white" : "#1E293B",
+                      }}>
+                        {msg.text}
+                      </div>
+                    </motion.div>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                  {aiLoading && (
+                    <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                      <div style={{
+                        padding: "10px 14px", borderRadius: 12,
+                        backgroundColor: "#EBF0FA", color: "#64748B", fontSize: 13,
+                      }}>
+                        Thinking...
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* AI input */}
+                <div style={{ padding: 16, borderTop: "1px solid #F1F5F9" }}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      value={aiQuery}
+                      onChange={e => setAiQuery(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && handleAiSend()}
+                      placeholder="Ask about your issue..."
+                      style={{ ...inputStyle, flex: 1, padding: "10px 14px", fontSize: 13 }}
+                      onFocus={e => (e.target.style.borderColor = "#003399")}
+                      onBlur={e  => (e.target.style.borderColor = "#E2E8F0")}
+                    />
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleAiSend}
+                      style={{
+                        padding: "10px 14px", borderRadius: 10, border: "none",
+                        backgroundColor: "#003399", color: "white",
+                        cursor: "pointer", flexShrink: 0,
+                        display: "flex", alignItems: "center",
+                      }}
+                    >
+                      <Send size={15} />
+                    </motion.button>
+                  </div>
+                  <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 8, textAlign: "center" }}>
+                    Try AI first before troubleshooting manually
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+
           </div>
         </main>
       </div>

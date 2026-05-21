@@ -142,16 +142,41 @@ export default function StaffPortal() {
   async function handleAiSend() {
     if (!aiQuery.trim()) return;
     const userMsg = aiQuery.trim();
+
+    // Add user message to chat immediately
     setAiMessages(prev => [...prev, { role: "user", text: userMsg }]);
     setAiQuery("");
     setAiLoading(true);
-    setTimeout(() => {
+
+    try {
+      // Call our Next.js API route which connects to Grok
+      const response = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userMsg }),
+      });
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      // Add AI response to chat
       setAiMessages(prev => [...prev, {
         role: "ai",
-        text: `For "${userMsg}", try restarting the device first. Check all cable connections and restart the relevant service. If the issue persists, submit a ticket and a technician will assist you.`,
+        text: data.reply,
       }]);
+
+    } catch (error) {
+      // Show error message in chat if API call fails
+      setAiMessages(prev => [...prev, {
+        role: "ai",
+        text: "I am currently unavailable. Please try again or submit a ticket directly.",
+      }]);
+    } finally {
       setAiLoading(false);
-    }, 1500);
+    }
   }
 
   // ── SUCCESS SCREEN ──────────────────────────────────────────────────────
