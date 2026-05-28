@@ -4,83 +4,56 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Shield, Monitor } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAuthStore, mockUsers } from "@/store/authStore";
+import { useAuthStore } from "@/store/authStore";
+import api from "@/lib/api";
 
 export default function LoginPage() {
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
 
   // Login form state
-  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
+  const [loginForm, setLoginForm] = useState({ username: "", password: "" });
 
   // Signup form state
   const [signupForm, setSignupForm] = useState({
-    name: "", email: "", department: "", password: ""
+    first_name: "", last_name: "", email: "",
+    username: "", department: "", password: ""
   });
 
   // Auth store and router
-  const { login } = useAuthStore();
+  const { login, loading, error } = useAuthStore();
   const router = useRouter();
 
-  // Handle login form submission
-  function handleLogin(e: React.FormEvent) {
+  // Handle login form submission — calls real Django API
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    // Simulate network delay
-    setTimeout(() => {
-      // Find user in mock data — will be replaced by real API call
-      const user = mockUsers.find(
-        u => u.email === loginForm.email && u.password === loginForm.password
-      );
-
-      if (!user) {
-        setError("Invalid email or password. Please try again.");
-        setLoading(false);
-        return;
-      }
-
-      // Log the user in and store in global state
-      login({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        department: user.department,
-      });
-
-      // Redirect based on role
-      if (user.role === "intern")      router.push("/intern");
-      if (user.role === "staff")       router.push("/staff");
-      if (user.role === "supervisor")  router.push("/supervisor");
-
-      setLoading(false);
-    }, 800);
+    const role = await login(loginForm.username, loginForm.password);
+    if (role === "intern")     router.push("/intern");
+    if (role === "staff")      router.push("/staff");
+    if (role === "supervisor") router.push("/supervisor");
+    if (role === "admin")      router.push("/supervisor");
   }
 
-  // Handle signup form submission
-  function handleSignup(e: React.FormEvent) {
+  // Handle signup form submission — registers new staff account
+  async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    // Simulate account creation — will be replaced by real API
-    setTimeout(() => {
-      // After signup, default new users to staff role
-      login({
-        id: Date.now().toString(),
-        name: signupForm.name,
-        email: signupForm.email,
-        role: "staff",
-        department: signupForm.department,
+    try {
+      await api.post("/api/auth/register/", {
+        username:   signupForm.username,
+        email:      signupForm.email,
+        first_name: signupForm.first_name,
+        last_name:  signupForm.last_name,
+        password:   signupForm.password,
+        role:       "staff",
       });
 
-      router.push("/staff");
-      setLoading(false);
-    }, 800);
+      // After signup automatically log them in
+      const role = await login(signupForm.username, signupForm.password);
+      if (role) router.push("/staff");
+
+    } catch (err: any) {
+      console.error("Signup error:", err.response?.data);
+    }
   }
 
   return (
@@ -197,14 +170,14 @@ export default function LoginPage() {
                 <form onSubmit={handleLogin} className="space-y-6">
                   <div>
                     <label className="block text-sm font-semibold mb-2" style={{ color: "#1E293B" }}>
-                      OPCS Email Address
+                      Username
                     </label>
                     <input
-                      type="email"
+                      type="text"
                       required
-                      placeholder="yourname@opcs.go.ke"
-                      value={loginForm.email}
-                      onChange={e => setLoginForm(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="your username"
+                      value={loginForm.username}
+                      onChange={e => setLoginForm(prev => ({ ...prev, username: e.target.value }))}
                       className="w-full px-5 py-4 rounded-xl border-2 text-base transition-all outline-none"
                       style={{ borderColor: "#E2E8F0", color: "#1E293B" }}
                       onFocus={e => (e.target.style.borderColor = "#003399")}
@@ -256,16 +229,51 @@ export default function LoginPage() {
               {/* SIGNUP FORM */}
               {activeTab === "signup" && (
                 <form onSubmit={handleSignup} className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold mb-2" style={{ color: "#1E293B" }}>
+                        First Name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Elikanah"
+                        value={signupForm.first_name}
+                        onChange={e => setSignupForm(prev => ({ ...prev, first_name: e.target.value }))}
+                        className="w-full px-5 py-4 rounded-xl border-2 text-base transition-all outline-none"
+                        style={{ borderColor: "#E2E8F0", color: "#1E293B" }}
+                        onFocus={e => (e.target.style.borderColor = "#003399")}
+                        onBlur={e  => (e.target.style.borderColor = "#E2E8F0")}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2" style={{ color: "#1E293B" }}>
+                        Last Name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Njuru"
+                        value={signupForm.last_name}
+                        onChange={e => setSignupForm(prev => ({ ...prev, last_name: e.target.value }))}
+                        className="w-full px-5 py-4 rounded-xl border-2 text-base transition-all outline-none"
+                        style={{ borderColor: "#E2E8F0", color: "#1E293B" }}
+                        onFocus={e => (e.target.style.borderColor = "#003399")}
+                        onBlur={e  => (e.target.style.borderColor = "#E2E8F0")}
+                      />
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-semibold mb-2" style={{ color: "#1E293B" }}>
-                      Full Name
+                      Username
                     </label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Elikanah Njuru"
-                      value={signupForm.name}
-                      onChange={e => setSignupForm(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Choose a username"
+                      value={signupForm.username}
+                      onChange={e => setSignupForm(prev => ({ ...prev, username: e.target.value }))}
                       className="w-full px-5 py-4 rounded-xl border-2 text-base transition-all outline-none"
                       style={{ borderColor: "#E2E8F0", color: "#1E293B" }}
                       onFocus={e => (e.target.style.borderColor = "#003399")}
