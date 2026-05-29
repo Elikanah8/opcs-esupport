@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Send, Paperclip, Bot, Shield,
   AlertCircle, LayoutDashboard, ListTodo,
-  LogOut, Settings, Clock,
+  LogOut, Settings, Clock, X,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/authStore";
+
+type NavTab = "report" | "my_tickets" | "history" | "settings";
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────
 const priorities = [
@@ -36,13 +40,6 @@ const locations = [
   "Server Room - Basement",
 ];
 
-const navItems = [
-  { icon: LayoutDashboard, label: "Report Issue",   active: true  },
-  { icon: ListTodo,        label: "My Tickets",     active: false },
-  { icon: Clock,           label: "Ticket History", active: false },
-  { icon: Settings,        label: "Settings",       active: false },
-];
-
 // ── TYPES ──────────────────────────────────────────────────────────────────
 type AIMessage = { role: "user" | "ai"; text: string };
 type FormState = { title: string; description: string; priority: string; location: string; department: string };
@@ -61,13 +58,24 @@ const inputStyle: React.CSSProperties = {
   backgroundColor: "white",
 };
 
-// ── SIDEBAR (shared between main and success screen) ───────────────────────
-function Sidebar() {
+const navItems = [
+  { icon: LayoutDashboard, label: "Report Issue",   active: true,  href: "/staff"          },
+  { icon: ListTodo,        label: "My Tickets",     active: false, href: "/staff/tickets"  },
+  { icon: Clock,           label: "Ticket History", active: false, href: "/staff/history"  },
+  { icon: Settings,        label: "Settings",       active: false, href: "/staff/settings" },
+];
+
+// ── SIDEBAR ────────────────────────────────────────────────────────────────
+function Sidebar({ activeNav, setActiveNav, userName, onLogout }: {
+  activeNav: NavTab;
+  setActiveNav: (t: NavTab) => void;
+  userName: string;
+  onLogout: () => void;
+}) {
+  const router = useRouter();
+  const initial = userName.charAt(0).toUpperCase();
   return (
-    <aside style={{
-      width: 240, minWidth: 240, display: "flex", flexDirection: "column",
-      height: "100%", backgroundColor: "#003399",
-    }}>
+    <aside style={{ width: 240, minWidth: 240, display: "flex", flexDirection: "column", height: "100%", backgroundColor: "#003399" }}>
       <div style={{ padding: 24, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <img src="/coat-of-arms.jpg" alt="OPCS" style={{ width: 40, height: 40, objectFit: "contain" }} />
@@ -77,37 +85,37 @@ function Sidebar() {
           </div>
         </div>
       </div>
-
       <nav style={{ flex: 1, padding: 16, display: "flex", flexDirection: "column", gap: 4 }}>
         {navItems.map((item, i) => (
-          <button key={i} style={{
-            width: "100%", display: "flex", alignItems: "center", gap: 12,
-            padding: "12px 16px", borderRadius: 12, border: "none", cursor: "pointer",
-            backgroundColor: item.active ? "rgba(255,255,255,0.15)" : "transparent",
-            color: item.active ? "white" : "rgba(255,255,255,0.55)",
-            fontSize: 14, fontWeight: 600, textAlign: "left",
-          }}>
+          <button
+            key={i}
+            onClick={() => router.push(item.href)}
+            style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "12px 16px", borderRadius: 12, border: "none",
+              cursor: "pointer",
+              backgroundColor: item.active ? "rgba(255,255,255,0.15)" : "transparent",
+              color: item.active ? "white" : "rgba(255,255,255,0.55)",
+              fontSize: 14, fontWeight: 600, textAlign: "left", width: "100%",
+            }}
+          >
             <item.icon size={18} />
             {item.label}
           </button>
         ))}
       </nav>
-
       <div style={{ padding: 16, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
-            backgroundColor: "#FFCC00", color: "#003399",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontWeight: 900, fontSize: 14,
-          }}>S</div>
+          <div style={{ width: 36, height: 36, borderRadius: "50%", flexShrink: 0, backgroundColor: "#FFCC00", color: "#003399", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 14 }}>
+            {initial}
+          </div>
           <div style={{ overflow: "hidden", flex: 1 }}>
-            <p style={{ color: "white", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              Staff Member
-            </p>
+            <p style={{ color: "white", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{userName}</p>
             <p style={{ color: "#93C5FD", fontSize: 11 }}>OPCS Staff</p>
           </div>
-          <LogOut size={16} color="#93C5FD" style={{ cursor: "pointer", flexShrink: 0 }} />
+          <button onClick={onLogout} title="Logout" style={{ background: "none", border: "none", cursor: "pointer", display: "flex", padding: 4 }}>
+            <LogOut size={15} color="#93C5FD" />
+          </button>
         </div>
       </div>
     </aside>
@@ -116,6 +124,16 @@ function Sidebar() {
 
 // ── MAIN COMPONENT ─────────────────────────────────────────────────────────
 export default function StaffPortal() {
+  const { user, logout, rehydrate } = useAuthStore();
+  const router = useRouter();
+  const userName = user?.name || "Staff Member";
+  const initial  = userName.charAt(0).toUpperCase();
+
+  const [activeNav, setActiveNav] = useState<NavTab>("report");
+
+  useEffect(() => {
+    rehydrate();
+  }, []);
   const [form, setForm] = useState<FormState>({
     title: "", description: "", priority: "medium", location: "", department: "",
   });
@@ -128,6 +146,8 @@ export default function StaffPortal() {
   const [file,      setFile]      = useState<File | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [ticketRef, setTicketRef] = useState("");
+
+  function handleLogout() { logout(); router.push("/login"); }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -183,7 +203,7 @@ export default function StaffPortal() {
   if (submitted) {
     return (
       <div style={{ display: "flex", height: "100vh", width: "100%", overflow: "hidden", backgroundColor: "#F5F7FA" }}>
-        <Sidebar />
+        <Sidebar activeNav={activeNav} setActiveNav={setActiveNav} userName={userName} onLogout={handleLogout} />
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }}>
           <motion.div
             initial={{ scale: 0.85, opacity: 0 }}
@@ -249,7 +269,7 @@ export default function StaffPortal() {
   // ── MAIN PORTAL ─────────────────────────────────────────────────────────
   return (
     <div style={{ display: "flex", height: "100vh", width: "100%", overflow: "hidden", backgroundColor: "#F5F7FA" }}>
-      <Sidebar />
+      <Sidebar activeNav={activeNav} setActiveNav={setActiveNav} userName={userName} onLogout={handleLogout} />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
@@ -260,14 +280,20 @@ export default function StaffPortal() {
           borderBottom: "1px solid #E2E8F0", flexShrink: 0,
         }}>
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 900, color: "#003399" }}>Report an IT Issue</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 900, color: "#003399" }}>
+              {activeNav === "report"     && "Report an IT Issue"}
+              {activeNav === "my_tickets" && "My Submitted Tickets"}
+              {activeNav === "history"    && "Ticket History"}
+              {activeNav === "settings"   && "Settings"}
+            </h1>
             <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>
-              Fill in the form — a technician will be assigned to your request
+              {activeNav === "report" ? "Fill in the form — a technician will be assigned to your request" : `Welcome, ${userName}`}
             </p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Shield size={16} color="#EAB308" />
             <span style={{ fontSize: 14, fontWeight: 600, color: "#64748B" }}>Secure Platform</span>
+            <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: "#003399", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 14, marginLeft: 8 }}>{initial}</div>
           </div>
         </header>
 
@@ -276,6 +302,48 @@ export default function StaffPortal() {
 
         {/* Scrollable content */}
         <main style={{ flex: 1, overflowY: "auto", padding: 32 }}>
+
+          {/* Settings view */}
+          {activeNav === "settings" && (
+            <div style={{ backgroundColor: "white", borderRadius: 16, padding: 32, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", maxWidth: 600 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 800, color: "#003399", marginBottom: 24 }}>Account Settings</h2>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {[
+                  { label: "Full Name",   value: userName },
+                  { label: "Email",       value: user?.email || "—" },
+                  { label: "Username",    value: user?.username || "—" },
+                  { label: "Department",  value: user?.department || "—" },
+                  { label: "Role",        value: "OPCS Staff Member" },
+                ].map(row => (
+                  <div key={row.label} style={{ padding: 20, borderRadius: 12, backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+                    <p style={{ fontSize: 12, color: "#94A3B8", marginBottom: 4 }}>{row.label}</p>
+                    <p style={{ fontSize: 15, fontWeight: 700, color: "#1E293B" }}>{row.value}</p>
+                  </div>
+                ))}
+                <button onClick={handleLogout} style={{ padding: "14px 0", borderRadius: 12, border: "none", backgroundColor: "#FFE5E5", color: "#CC0000", fontSize: 14, fontWeight: 700, cursor: "pointer", marginTop: 8 }}>
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* My Tickets / History placeholder */}
+          {(activeNav === "my_tickets" || activeNav === "history") && (
+            <div style={{ backgroundColor: "white", borderRadius: 16, padding: 48, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", textAlign: "center" }}>
+              <p style={{ fontSize: 32, marginBottom: 12 }}>📋</p>
+              <h3 style={{ fontSize: 18, fontWeight: 800, color: "#003399", marginBottom: 8 }}>
+                {activeNav === "my_tickets" ? "My Submitted Tickets" : "Ticket History"}
+              </h3>
+              <p style={{ color: "#94A3B8", fontSize: 14 }}>
+                {activeNav === "my_tickets"
+                  ? "Tickets you submit will appear here so you can track their status."
+                  : "Your full ticket history will be shown here once the backend is connected."}
+              </p>
+            </div>
+          )}
+
+          {/* Report Issue form */}
+          {activeNav === "report" && (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 28, maxWidth: 1400, margin: "0 auto" }}>
 
             {/* ── TICKET FORM ── */}
@@ -502,6 +570,7 @@ export default function StaffPortal() {
             </motion.div>
 
           </div>
+          )} {/* end activeNav === "report" */}
         </main>
       </div>
     </div>
