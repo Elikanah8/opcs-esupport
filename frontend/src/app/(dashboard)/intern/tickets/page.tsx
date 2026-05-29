@@ -1,0 +1,189 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { LayoutDashboard, ListTodo, CheckCircle, Settings, LogOut, MapPin } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/authStore";
+import api from "@/lib/api";
+
+type Priority = "low" | "medium" | "high" | "critical";
+type Status = "submitted" | "claimed" | "in_progress" | "awaiting" | "resolved";
+
+const priorityStyle: Record<Priority, { bg: string; text: string }> = {
+  low:      { bg: "#E8F5EE", text: "#1A6B3C" },
+  medium:   { bg: "#FFF4E5", text: "#FF8C00" },
+  high:     { bg: "#FFE5E5", text: "#CC0000" },
+  critical: { bg: "#3D0000", text: "#FF6B6B" },
+};
+
+const statusStyle: Record<Status, { bg: string; text: string; label: string }> = {
+  submitted:   { bg: "#EBF0FA", text: "#003399", label: "Submitted"   },
+  claimed:     { bg: "#FFF4E5", text: "#FF8C00", label: "Claimed"     },
+  in_progress: { bg: "#F3E8FF", text: "#9333EA", label: "In Progress" },
+  awaiting:    { bg: "#FFE5E5", text: "#CC0000", label: "Awaiting"    },
+  resolved:    { bg: "#E8F5EE", text: "#1A6B3C", label: "Resolved"    },
+};
+
+const navItems = [
+  { icon: LayoutDashboard, label: "Dashboard",  href: "/intern"          },
+  { icon: ListTodo,        label: "My Tickets", href: "/intern/tickets"  },
+  { icon: CheckCircle,     label: "Resolved",   href: "/intern/resolved" },
+  { icon: Settings,        label: "Settings",   href: "/intern/settings" },
+];
+
+type TicketItem = {
+  id: number;
+  reference: string;
+  title: string;
+  priority: Priority;
+  status: Status;
+  location: string;
+  created_at: string;
+  claimed_by_name: string | null;
+};
+
+export default function InternMyTicketsPage() {
+  const [tickets, setTickets] = useState<TicketItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user, logout } = useAuthStore();
+  const router = useRouter();
+
+  useEffect(() => {
+    async function fetchMyTickets() {
+      try {
+        const response = await api.get("/api/tickets/");
+        // Only show tickets claimed by this intern
+        const mine = response.data.filter(
+          (t: any) => t.claimed_by_name === user?.name
+        );
+        setTickets(mine);
+      } catch (error) {
+        console.error("Failed to fetch tickets:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchMyTickets();
+  }, [user]);
+
+  function handleLogout() {
+    logout();
+    router.push("/login");
+  }
+
+  return (
+    <div style={{ display: "flex", height: "100vh", width: "100%", overflow: "hidden", backgroundColor: "#F5F7FA" }}>
+
+      {/* SIDEBAR */}
+      <aside style={{ width: 240, minWidth: 240, display: "flex", flexDirection: "column", height: "100%", backgroundColor: "#003399" }}>
+        <div style={{ padding: 24, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <img src="/coat-of-arms.jpg" alt="OPCS" style={{ width: 40, height: 40, objectFit: "contain" }} />
+            <div>
+              <p style={{ color: "white", fontWeight: 800, fontSize: 14 }}>OPCS eSupport</p>
+              <p style={{ color: "#93C5FD", fontSize: 11 }}>Intern Portal</p>
+            </div>
+          </div>
+        </div>
+
+        <nav style={{ flex: 1, padding: 16, display: "flex", flexDirection: "column", gap: 4 }}>
+          {navItems.map((item, i) => (
+            <button
+              key={i}
+              onClick={() => router.push(item.href)}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 12, border: "none", cursor: "pointer", backgroundColor: item.href === "/intern/tickets" ? "rgba(255,255,255,0.15)" : "transparent", color: item.href === "/intern/tickets" ? "white" : "rgba(255,255,255,0.55)", fontSize: 14, fontWeight: 600, textAlign: "left", width: "100%" }}
+            >
+              <item.icon size={18} />
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        <div style={{ padding: 16, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: "#FFCC00", color: "#003399", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
+              {user?.name?.charAt(0) || "I"}
+            </div>
+            <div style={{ overflow: "hidden", flex: 1 }}>
+              <p style={{ color: "white", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user?.name || "Intern"}</p>
+              <p style={{ color: "#93C5FD", fontSize: 11 }}>ICT Intern</p>
+            </div>
+            <LogOut size={15} style={{ color: "#93C5FD", cursor: "pointer", flexShrink: 0 }} onClick={handleLogout} />
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <header style={{ padding: "16px 32px", backgroundColor: "white", borderBottom: "1px solid #E2E8F0", flexShrink: 0 }}>
+          <h1 style={{ fontSize: 20, fontWeight: 800, color: "#003399" }}>My Tickets</h1>
+          <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Tickets you have claimed and are working on</p>
+        </header>
+
+        <div style={{ height: 4, backgroundColor: "#FFCC00", flexShrink: 0 }} />
+
+        <main style={{ flex: 1, overflowY: "auto", padding: 32 }}>
+          <div style={{ backgroundColor: "white", borderRadius: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", overflow: "hidden" }}>
+            {loading ? (
+              <div style={{ padding: 48, textAlign: "center", color: "#94A3B8" }}>Loading...</div>
+            ) : tickets.length === 0 ? (
+              <div style={{ padding: 48, textAlign: "center", color: "#94A3B8" }}>You have not claimed any tickets yet.</div>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ backgroundColor: "#F8FAFC" }}>
+                    {["Reference", "Title", "Location", "Priority", "Status", "Date"].map(h => (
+                      <th key={h} style={{ padding: "10px 20px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {tickets.map((ticket, i) => (
+                    <motion.tr
+                      key={ticket.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: i * 0.05 }}
+                      style={{ borderTop: "1px solid #F1F5F9" }}
+                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#F8FAFC")}
+                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+                    >
+                      <td style={{ padding: "14px 20px" }}>
+                        <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 700, color: "#003399" }}>{ticket.reference}</span>
+                      </td>
+                      <td style={{ padding: "14px 20px" }}>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: "#1E293B" }}>{ticket.title}</p>
+                      </td>
+                      <td style={{ padding: "14px 20px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <MapPin size={12} style={{ color: "#94A3B8" }} />
+                          <span style={{ fontSize: 13, color: "#64748B" }}>{ticket.location}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: "14px 20px" }}>
+                        <span style={{ padding: "4px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700, backgroundColor: priorityStyle[ticket.priority]?.bg, color: priorityStyle[ticket.priority]?.text }}>
+                          {ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1)}
+                        </span>
+                      </td>
+                      <td style={{ padding: "14px 20px" }}>
+                        <span style={{ padding: "4px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700, backgroundColor: statusStyle[ticket.status]?.bg, color: statusStyle[ticket.status]?.text }}>
+                          {statusStyle[ticket.status]?.label}
+                        </span>
+                      </td>
+                      <td style={{ padding: "14px 20px" }}>
+                        <span style={{ fontSize: 12, color: "#94A3B8" }}>
+                          {new Date(ticket.created_at).toLocaleDateString()}
+                        </span>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}

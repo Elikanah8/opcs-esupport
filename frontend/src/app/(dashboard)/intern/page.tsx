@@ -57,6 +57,12 @@ const INITIAL_TICKETS: TicketItem[] = [
     priority: "high", status: "submitted", location: "5th Floor - Executive",
     submittedBy: "Grace Wanjiku", createdAt: "2026-05-29 10:00" },
 ];
+const navItems = [
+  { icon: LayoutDashboard, label: "Dashboard",  href: "/intern"          },
+  { icon: ListTodo,        label: "My Tickets", href: "/intern/tickets"  },
+  { icon: CheckCircle,     label: "Resolved",   href: "/intern/resolved" },
+  { icon: Settings,        label: "Settings",   href: "/intern/settings" },
+];
 
 export default function InternDashboard() {
   const { user, logout, rehydrate } = useAuthStore();
@@ -93,13 +99,6 @@ export default function InternDashboard() {
     return tickets.filter(t => t.status !== "resolved"); // dashboard = all open
   })();
 
-  const navItems: { key: NavTab; icon: any; label: string }[] = [
-    { key: "dashboard",  icon: LayoutDashboard, label: "Dashboard"  },
-    { key: "my_tickets", icon: ListTodo,        label: "My Tickets" },
-    { key: "resolved",   icon: CheckCircle,     label: "Resolved"   },
-    { key: "settings",   icon: Settings,        label: "Settings"   },
-  ];
-
   return (
     <div style={{ display: "flex", height: "100vh", width: "100%", overflow: "hidden", backgroundColor: "#F5F7FA" }}>
 
@@ -116,15 +115,12 @@ export default function InternDashboard() {
         </div>
 
         <nav style={{ flex: 1, padding: 16, display: "flex", flexDirection: "column", gap: 4 }}>
-          {navItems.map(item => (
-            <button key={item.key} onClick={() => setActiveNav(item.key)} style={{
-              width: "100%", display: "flex", alignItems: "center", gap: 12,
-              padding: "12px 16px", borderRadius: 12, border: "none", cursor: "pointer",
-              backgroundColor: activeNav === item.key ? "rgba(255,255,255,0.18)" : "transparent",
-              color: activeNav === item.key ? "white" : "rgba(255,255,255,0.55)",
-              fontSize: 14, fontWeight: 600, textAlign: "left",
-              borderLeft: activeNav === item.key ? "3px solid #FFCC00" : "3px solid transparent",
-            }}>
+          {navItems.map((item, i) => (
+            <button
+              key={i}
+              onClick={() => router.push(item.href)}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 12, border: "none", cursor: "pointer", backgroundColor: item.href === "/intern" ? "rgba(255,255,255,0.15)" : "transparent", color: item.href === "/intern" ? "white" : "rgba(255,255,255,0.55)", fontSize: 14, fontWeight: 600, textAlign: "left", width: "100%" }}
+            >
               <item.icon size={18} />
               {item.label}
             </button>
