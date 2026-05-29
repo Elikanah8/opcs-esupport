@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   TicketIcon, CheckCircle, AlertTriangle, Clock,
@@ -80,14 +81,15 @@ const statusStyle: Record<Status, { bg: string; text: string; label: string }> =
 
 // Sidebar nav
 const navItems = [
-  { icon: LayoutDashboard, label: "Overview",      active: true  },
-  { icon: TicketIcon,      label: "All Tickets",   active: false },
-  { icon: Users,           label: "Intern Team",   active: false },
-  { icon: BarChart2,       label: "Analytics",     active: false },
-  { icon: Settings,        label: "Settings",      active: false },
+  { icon: LayoutDashboard, label: "Overview",    href: "/supervisor"           },
+  { icon: TicketIcon,      label: "All Tickets", href: "/supervisor/tickets"   },
+  { icon: Users,           label: "Intern Team", href: "/supervisor/team"      },
+  { icon: BarChart2,       label: "Analytics",   href: "/supervisor/analytics" },
+  { icon: Settings,        label: "Settings",    href: "/supervisor/settings"  },
 ];
 
 export default function SupervisorDashboard() {
+  const router = useRouter();
   const [notifOpen, setNotifOpen] = useState(false);
 
   // Summary stats
@@ -120,13 +122,8 @@ export default function SupervisorDashboard() {
           {navItems.map((item, i) => (
             <button
               key={i}
-              style={{
-                display: "flex", alignItems: "center", gap: 12,
-                padding: "12px 16px", borderRadius: 12, border: "none", cursor: "pointer",
-                backgroundColor: item.active ? "rgba(255,255,255,0.15)" : "transparent",
-                color: item.active ? "white" : "rgba(255,255,255,0.55)",
-                fontSize: 14, fontWeight: 600, textAlign: "left", width: "100%",
-              }}
+              onClick={() => router.push(item.href)}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 12, border: "none", cursor: "pointer", backgroundColor: item.href === "/supervisor" ? "rgba(255,255,255,0.15)" : "transparent", color: item.href === "/supervisor" ? "white" : "rgba(255,255,255,0.55)", fontSize: 14, fontWeight: 600, textAlign: "left", width: "100%" }}
             >
               <item.icon size={18} />
               {item.label}
