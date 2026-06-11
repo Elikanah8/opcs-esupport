@@ -3,8 +3,6 @@ from rest_framework import status, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
 from .models import Ticket, TicketLog, Notification, AssistanceRequest, Department
 from .serializers import (
     UserSerializer, RegisterSerializer, TicketSerializer,
@@ -12,14 +10,16 @@ from .serializers import (
 )
 
 User = get_user_model()
-channel_layer = get_channel_layer()
 
 
 def broadcast_ticket_update(event_type: str, ticket_data: dict):
     """Send a real-time update to all connected WebSocket clients."""
-    if channel_layer is None:
-        return
     try:
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        channel_layer = get_channel_layer()
+        if channel_layer is None:
+            return
         async_to_sync(channel_layer.group_send)(
             'tickets_room',
             {'type': 'ticket_update', 'data': {'event': event_type, 'ticket': ticket_data}}
