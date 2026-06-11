@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, Shield, Monitor, Users, UserCheck } from "lucide-react";
+import { Eye, EyeOff, Shield, Monitor, Users, UserCheck, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 
 const departments = [
@@ -16,9 +16,16 @@ const departments = [
   "Human Resource Directorate",
 ];
 
+function getRoleRedirect(role: string): string {
+  if (role === "intern")     return "/intern";
+  if (role === "supervisor") return "/supervisor";
+  if (role === "admin")      return "/supervisor"; // admins see supervisor panel
+  return "/staff";
+}
+
 export default function LoginPage() {
   const router = useRouter();
-  const { login, register, rehydrate, error, setError } = useAuthStore();
+  const { login, register, rehydrate, isLoading, error, setError } = useAuthStore();
 
   const [activeTab,    setActiveTab]    = useState<"login" | "signup">("login");
   const [showPassword, setShowPassword] = useState(false);
@@ -31,16 +38,18 @@ export default function LoginPage() {
     role: "staff" as "staff" | "intern",
   });
 
-  // Rehydrate session on mount — if already logged in, redirect
+  // Rehydrate session — if already logged in, redirect
   useEffect(() => {
     rehydrate();
     const saved = localStorage.getItem("opcs_current_user");
     if (saved) {
       try {
         const u = JSON.parse(saved);
-        router.replace(u.role === "intern" ? "/intern" : "/staff");
+        const token = localStorage.getItem("access_token");
+        if (token) router.replace(getRoleRedirect(u.role));
       } catch { /* ignore */ }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function clearErrors() {
@@ -48,18 +57,18 @@ export default function LoginPage() {
     setError("");
   }
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     clearErrors();
-    const result = login(loginForm.username, loginForm.password);
+    const result = await login(loginForm.username, loginForm.password);
     if (result.success && result.role) {
-      router.push(result.role === "intern" ? "/intern" : "/staff");
+      router.push(getRoleRedirect(result.role));
     } else {
       setLocalError(result.message || "Incorrect username or password.");
     }
   }
 
-  function handleSignup(e: React.FormEvent) {
+  async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
     clearErrors();
 
@@ -79,10 +88,11 @@ export default function LoginPage() {
       setLocalError("Passwords do not match."); return;
     }
 
-    const result = register({
-      name:       `${signupForm.firstName.trim()} ${signupForm.lastName.trim()}`,
-      email:      signupForm.email.trim(),
+    const result = await register({
+      firstName:  signupForm.firstName.trim(),
+      lastName:   signupForm.lastName.trim(),
       username:   signupForm.username.trim(),
+      email:      signupForm.email.trim(),
       role:       signupForm.role,
       department: signupForm.department,
       password:   signupForm.password,
@@ -90,9 +100,10 @@ export default function LoginPage() {
 
     if (!result.success) { setLocalError(result.message); return; }
 
-    const loginResult = login(signupForm.username.trim(), signupForm.password);
+    // Auto-login after successful registration
+    const loginResult = await login(signupForm.username.trim(), signupForm.password);
     if (loginResult.success && loginResult.role) {
-      router.push(loginResult.role === "intern" ? "/intern" : "/staff");
+      router.push(getRoleRedirect(loginResult.role));
     }
   }
 
@@ -126,7 +137,7 @@ export default function LoginPage() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <Monitor size={13} color="#93C5FD" />
-            <span style={{ color: "#93C5FD", fontSize: 12 }}>OPCS eSupport v1.0 — May 2026</span>
+            <span style={{ color: "#93C5FD", fontSize: 12 }}>OPCS eSupport v1.0 — June 2026</span>
           </div>
         </div>
       </motion.div>
@@ -190,7 +201,9 @@ export default function LoginPage() {
                     </button>
                   </div>
                 </div>
-                <button type="submit" style={btn}>Sign In to OPCS eSupport</button>
+                <button type="submit" disabled={isLoading} style={{ ...btn, opacity: isLoading ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  {isLoading ? <><Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} /> Signing in...</> : "Sign In to OPCS eSupport"}
+                </button>
                 <p style={{ textAlign: "center", fontSize: 13, color: "#64748B" }}>
                   No account?{" "}
                   <button type="button" onClick={() => { setActiveTab("signup"); clearErrors(); }}
@@ -290,7 +303,9 @@ export default function LoginPage() {
                     style={inp} onFocus={e => (e.target.style.borderColor = "#003399")} onBlur={e => (e.target.style.borderColor = "#E2E8F0")} />
                 </div>
 
-                <button type="submit" style={btn}>Create My Account & Sign In</button>
+                <button type="submit" disabled={isLoading} style={{ ...btn, opacity: isLoading ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  {isLoading ? <><Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} /> Creating account...</> : "Create My Account & Sign In"}
+                </button>
 
                 <p style={{ textAlign: "center", fontSize: 13, color: "#64748B" }}>
                   Already have an account?{" "}
@@ -310,6 +325,8 @@ export default function LoginPage() {
           </p>
         </div>
       </motion.div>
+
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

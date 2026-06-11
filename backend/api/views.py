@@ -3,6 +3,8 @@ from rest_framework import status, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 from .models import Ticket, TicketLog, Notification, AssistanceRequest, Department
 from .serializers import (
     UserSerializer, RegisterSerializer, TicketSerializer,
@@ -10,6 +12,20 @@ from .serializers import (
 )
 
 User = get_user_model()
+channel_layer = get_channel_layer()
+
+
+def broadcast_ticket_update(event_type: str, ticket_data: dict):
+    """Send a real-time update to all connected WebSocket clients."""
+    if channel_layer is None:
+        return
+    try:
+        async_to_sync(channel_layer.group_send)(
+            'tickets_room',
+            {'type': 'ticket_update', 'data': {'event': event_type, 'ticket': ticket_data}}
+        )
+    except Exception:
+        pass  # Never let a broadcast failure break an API response
 
 
 class RegisterView(APIView):
@@ -90,6 +106,7 @@ class TicketListCreateView(APIView):
                     type='new_ticket'
                 )
 
+            broadcast_ticket_update('new_ticket', TicketSerializer(ticket).data)
             return Response(TicketSerializer(ticket).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -165,6 +182,7 @@ class ClaimTicketView(APIView):
                 type='claimed'
             )
 
+        broadcast_ticket_update('claimed', TicketSerializer(ticket).data)
         return Response(TicketSerializer(ticket).data)
 
 
@@ -201,6 +219,7 @@ class ResolveTicketView(APIView):
                 type='resolved'
             )
 
+        broadcast_ticket_update('resolved', TicketSerializer(ticket).data)
         return Response(TicketSerializer(ticket).data)
 
 

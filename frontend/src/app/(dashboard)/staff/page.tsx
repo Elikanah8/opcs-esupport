@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
+import api from "@/lib/api";
 
 type NavTab = "report" | "my_tickets" | "history" | "settings";
 
@@ -142,10 +143,12 @@ export default function StaffPortal() {
     role: "ai",
     text: "Hello! I am the OPCS IT Assistant. Describe your issue and I will try to help you resolve it before you submit a ticket.",
   }]);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [file,      setFile]      = useState<File | null>(null);
-  const [submitted, setSubmitted] = useState(false);
-  const [ticketRef, setTicketRef] = useState("");
+  const [aiLoading,    setAiLoading]    = useState(false);
+  const [file,         setFile]         = useState<File | null>(null);
+  const [submitted,    setSubmitted]    = useState(false);
+  const [ticketRef,    setTicketRef]    = useState("");
+  const [submitting,   setSubmitting]   = useState(false);
+  const [submitError,  setSubmitError]  = useState("");
 
   function handleLogout() { logout(); router.push("/login"); }
 
@@ -153,10 +156,28 @@ export default function StaffPortal() {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setTicketRef("TKT-" + Math.floor(Math.random() * 9000 + 1000));
-    setSubmitted(true);
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      const response = await api.post("/api/tickets/", {
+        title:       form.title,
+        description: form.description,
+        priority:    form.priority,
+        location:    form.location,
+        // department ID lookup not required — backend accepts name or null
+      });
+      setTicketRef(response.data.reference);
+      setSubmitted(true);
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        "Failed to submit ticket. Please try again.";
+      setSubmitError(msg);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function handleAiSend() {
@@ -456,19 +477,26 @@ export default function StaffPortal() {
                 </div>
 
                 {/* Submit */}
+                {submitError && (
+                  <div style={{ padding: "12px 16px", borderRadius: 10, backgroundColor: "#FFE5E5", color: "#CC0000", fontSize: 13, fontWeight: 600 }}>
+                    ⚠ {submitError}
+                  </div>
+                )}
                 <motion.button
-                  whileHover={{ scale: 1.02, boxShadow: "0 8px 28px rgba(0,51,153,0.35)" }}
+                  whileHover={{ scale: submitting ? 1 : 1.02, boxShadow: "0 8px 28px rgba(0,51,153,0.35)" }}
                   whileTap={{ scale: 0.98 }}
                   type="submit"
+                  disabled={submitting}
                   style={{
                     width: "100%", padding: "16px 0", borderRadius: 12, border: "none",
                     backgroundColor: "#003399", color: "white",
-                    fontSize: 16, fontWeight: 800, cursor: "pointer",
+                    fontSize: 16, fontWeight: 800, cursor: submitting ? "not-allowed" : "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                    opacity: submitting ? 0.7 : 1,
                   }}
                 >
                   <Send size={18} />
-                  Submit IT Support Request
+                  {submitting ? "Submitting..." : "Submit IT Support Request"}
                 </motion.button>
 
                 {/* Gold accent */}

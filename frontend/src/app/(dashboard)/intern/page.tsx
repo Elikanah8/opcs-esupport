@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -9,16 +9,19 @@ import {
   ListTodo, Settings, MapPin, User, X,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
+import api from "@/lib/api";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 type Priority = "low" | "medium" | "high" | "critical";
-type Status   = "submitted" | "claimed" | "in_progress" | "awaiting" | "resolved";
-type NavTab   = "dashboard" | "my_tickets" | "resolved" | "settings";
+type Status   = "submitted" | "claimed" | "in_progress" | "awaiting" | "resolved" | "closed";
 
 type TicketItem = {
-  id: string; reference: string; title: string; description: string;
+  id: number; reference: string; title: string; description: string;
   priority: Priority; status: Status; location: string;
-  submittedBy: string; createdAt: string; claimedBy?: string;
+  submitted_by_name: string; created_at: string; claimed_by_name?: string | null;
 };
+
+type Notification = { id: number; message: string; type: string; is_read: boolean; created_at: string };
 
 const priorityStyle: Record<Priority, { bg: string; color: string; label: string }> = {
   low:      { bg: "#E8F5EE", color: "#1A6B3C", label: "Low"      },
@@ -33,30 +36,11 @@ const statusStyle: Record<Status, { bg: string; color: string; label: string }> 
   in_progress: { bg: "#F3E8FF", color: "#9333EA", label: "In Progress" },
   awaiting:    { bg: "#FFE5E5", color: "#CC0000", label: "Awaiting"    },
   resolved:    { bg: "#E8F5EE", color: "#1A6B3C", label: "Resolved"    },
+  closed:      { bg: "#F1F5F9", color: "#64748B", label: "Closed"      },
 };
 
-const INITIAL_TICKETS: TicketItem[] = [
-  { id: "1", reference: "TKT-001", title: "Printer not connecting to network",
-    description: "The HP printer on 3rd floor is not showing on the network.",
-    priority: "high", status: "submitted", location: "3rd Floor - Finance",
-    submittedBy: "Jane Mwangi", createdAt: "2026-05-29 09:00" },
-  { id: "2", reference: "TKT-002", title: "Outlook not syncing emails",
-    description: "Emails not loading since this morning.",
-    priority: "medium", status: "submitted", location: "2nd Floor - Admin",
-    submittedBy: "Peter Otieno", createdAt: "2026-05-29 09:30" },
-  { id: "3", reference: "TKT-003", title: "Internet down in boardroom",
-    description: "No internet connection in the main boardroom.",
-    priority: "critical", status: "claimed", location: "1st Floor - Boardroom",
-    submittedBy: "Sarah Njeri", createdAt: "2026-05-29 08:00", claimedBy: "Mike Intern" },
-  { id: "4", reference: "TKT-004", title: "PDF conversion not working",
-    description: "Cannot convert Word documents to PDF.",
-    priority: "low", status: "resolved", location: "4th Floor - Legal",
-    submittedBy: "David Kamau", createdAt: "2026-05-29 07:00" },
-  { id: "5", reference: "TKT-005", title: "VPN not connecting remotely",
-    description: "Staff cannot access internal systems from home.",
-    priority: "high", status: "submitted", location: "5th Floor - Executive",
-    submittedBy: "Grace Wanjiku", createdAt: "2026-05-29 10:00" },
-];
+type NavTab = "dashboard" | "my_tickets" | "resolved" | "settings";
+
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard",  href: "/intern"          },
   { icon: ListTodo,        label: "My Tickets", href: "/intern/tickets"  },
@@ -67,36 +51,84 @@ const navItems = [
 export default function InternDashboard() {
   const { user, logout, rehydrate } = useAuthStore();
   const router = useRouter();
-  const [tickets,    setTickets]    = useState<TicketItem[]>(INITIAL_TICKETS);
-  const [activeNav,  setActiveNav]  = useState<NavTab>("dashboard");
-  const [notifOpen,  setNotifOpen]  = useState(false);
-  const [viewTicket, setViewTicket] = useState<TicketItem | null>(null);
-
-  useEffect(() => {
-    rehydrate();
-  }, []);
+  const [tickets,       setTickets]       = useState<TicketItem[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading,       setLoading]       = useState(true);
+  const [activeNav,     setActiveNav]     = useState<NavTab>("dashboard");
+  const [notifOpen,     setNotifOpen]     = useState(false);
+  const [viewTicket,    setViewTicket]    = useState<TicketItem | null>(null);
+  const [actionError,   setActionError]   = useState("");
 
   const myName = user?.name || "Intern";
   const initial = myName.charAt(0).toUpperCase();
 
+  const fetchTickets = useCallback(async () => {
+    try {
+      const res = await api.get("/api/tickets/");
+      setTickets(res.data);
+    } catch { /* silent */ } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await api.get("/api/notifications/");
+      setNotifications(res.data);
+    } catch { /* silent */ }
+  }, []);
+
+  useEffect(() => {
+    rehydrate();
+    fetchTickets();
+    fetchNotifications();
+  }, [fetchTickets, fetchNotifications]);
+
+  // Real-time: refresh when any ticket event fires from another user
+  useWebSocket("/ws/tickets/", () => { fetchTickets(); fetchNotifications(); });
+
   function handleLogout() { logout(); router.push("/login"); }
-  function claimTicket(id: string) {
-    setTickets(prev => prev.map(t => t.id === id ? { ...t, status: "claimed", claimedBy: myName } : t));
+
+  async function claimTicket(id: number) {
+    setActionError("");
+    try {
+      await api.post(`/api/tickets/${id}/claim/`);
+      await fetchTickets();
+      await fetchNotifications();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Could not claim ticket.";
+      setActionError(msg);
+    }
   }
-  function resolveTicket(id: string) {
-    setTickets(prev => prev.map(t => t.id === id ? { ...t, status: "resolved" } : t));
+
+  async function resolveTicket(id: number) {
+    setActionError("");
+    try {
+      await api.post(`/api/tickets/${id}/resolve/`);
+      await fetchTickets();
+      setViewTicket(null);
+    } catch {
+      setActionError("Could not resolve ticket.");
+    }
+  }
+
+  async function markNotifRead(id: number) {
+    try {
+      await api.patch(`/api/notifications/${id}/read/`);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    } catch { /* silent */ }
   }
 
   const openCount     = tickets.filter(t => t.status === "submitted").length;
-  const claimedCount  = tickets.filter(t => t.claimedBy === myName).length;
+  const claimedCount  = tickets.filter(t => t.claimed_by_name === myName).length;
   const urgentCount   = tickets.filter(t => t.priority === "critical" || t.priority === "high").length;
   const resolvedCount = tickets.filter(t => t.status === "resolved").length;
+  const unreadCount   = notifications.filter(n => !n.is_read).length;
 
-  // Which tickets to show based on active nav
   const visibleTickets = (() => {
-    if (activeNav === "my_tickets") return tickets.filter(t => t.claimedBy === myName);
+    if (activeNav === "my_tickets") return tickets.filter(t => t.claimed_by_name === myName);
     if (activeNav === "resolved")   return tickets.filter(t => t.status === "resolved");
-    return tickets.filter(t => t.status !== "resolved"); // dashboard = all open
+    return tickets.filter(t => t.status !== "resolved" && t.status !== "closed");
   })();
 
   return (
@@ -113,20 +145,18 @@ export default function InternDashboard() {
             </div>
           </div>
         </div>
-
         <nav style={{ flex: 1, padding: 16, display: "flex", flexDirection: "column", gap: 4 }}>
           {navItems.map((item, i) => (
-            <button
-              key={i}
-              onClick={() => router.push(item.href)}
-              style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 12, border: "none", cursor: "pointer", backgroundColor: item.href === "/intern" ? "rgba(255,255,255,0.15)" : "transparent", color: item.href === "/intern" ? "white" : "rgba(255,255,255,0.55)", fontSize: 14, fontWeight: 600, textAlign: "left", width: "100%" }}
-            >
+            <button key={i} onClick={() => router.push(item.href)}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 12, border: "none", cursor: "pointer",
+                backgroundColor: item.href === "/intern" ? "rgba(255,255,255,0.15)" : "transparent",
+                color: item.href === "/intern" ? "white" : "rgba(255,255,255,0.55)",
+                fontSize: 14, fontWeight: 600, textAlign: "left", width: "100%" }}>
               <item.icon size={18} />
               {item.label}
             </button>
           ))}
         </nav>
-
         <div style={{ padding: 16, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: "#FFCC00", color: "#003399", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 14, flexShrink: 0 }}>
@@ -143,7 +173,7 @@ export default function InternDashboard() {
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
+      {/* MAIN */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
         {/* Header */}
@@ -155,7 +185,7 @@ export default function InternDashboard() {
               {activeNav === "resolved"   && "Resolved Tickets"}
               {activeNav === "settings"   && "Settings"}
             </h1>
-            <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Good morning, {myName} — Friday, 29 May 2026</p>
+            <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Welcome, {myName}</p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 99, backgroundColor: "#E8F5EE" }}>
@@ -166,7 +196,9 @@ export default function InternDashboard() {
             <div style={{ position: "relative" }}>
               <button onClick={() => setNotifOpen(!notifOpen)} style={{ padding: 8, borderRadius: 10, border: "none", backgroundColor: "transparent", cursor: "pointer", position: "relative" }}>
                 <Bell size={20} color="#003399" />
-                <span style={{ position: "absolute", top: 2, right: 2, width: 18, height: 18, borderRadius: "50%", backgroundColor: "#FFCC00", color: "#003399", fontSize: 10, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>3</span>
+                {unreadCount > 0 && (
+                  <span style={{ position: "absolute", top: 2, right: 2, width: 18, height: 18, borderRadius: "50%", backgroundColor: "#FFCC00", color: "#003399", fontSize: 10, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>{unreadCount}</span>
+                )}
               </button>
               {notifOpen && (
                 <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
@@ -175,14 +207,14 @@ export default function InternDashboard() {
                     <p style={{ fontWeight: 700, fontSize: 14, color: "#003399" }}>Notifications</p>
                     <button onClick={() => setNotifOpen(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={14} color="#94A3B8" /></button>
                   </div>
-                  {[
-                    { msg: "New critical ticket — Boardroom internet down", time: "2 min ago" },
-                    { msg: "TKT-001 has been escalated", time: "10 min ago" },
-                    { msg: "Supervisor reviewed TKT-004", time: "1 hr ago" },
-                  ].map((n, i) => (
-                    <div key={i} style={{ padding: "12px 16px", borderBottom: "1px solid #F1F5F9" }}>
-                      <p style={{ fontSize: 13, color: "#374151" }}>{n.msg}</p>
-                      <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>{n.time}</p>
+                  {notifications.length === 0 && (
+                    <p style={{ padding: 20, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>No notifications yet.</p>
+                  )}
+                  {notifications.slice(0, 10).map(n => (
+                    <div key={n.id} onClick={() => markNotifRead(n.id)}
+                      style={{ padding: "12px 16px", borderBottom: "1px solid #F1F5F9", cursor: "pointer", backgroundColor: n.is_read ? "white" : "#F0F4FF" }}>
+                      <p style={{ fontSize: 13, color: "#374151" }}>{n.message}</p>
+                      <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>{new Date(n.created_at).toLocaleString()}</p>
                     </div>
                   ))}
                 </motion.div>
@@ -194,30 +226,31 @@ export default function InternDashboard() {
 
         <div style={{ height: 4, backgroundColor: "#FFCC00", flexShrink: 0 }} />
 
-        {/* SCROLLABLE CONTENT */}
         <main style={{ flex: 1, overflowY: "auto", padding: 32 }}>
 
-          {/* Settings page */}
+          {actionError && (
+            <div style={{ padding: "12px 16px", borderRadius: 10, backgroundColor: "#FFE5E5", color: "#CC0000", fontSize: 13, fontWeight: 600, marginBottom: 20 }}>
+              ⚠ {actionError}
+            </div>
+          )}
+
+          {/* Settings */}
           {activeNav === "settings" && (
             <div style={{ backgroundColor: "white", borderRadius: 16, padding: 32, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", maxWidth: 600 }}>
               <h2 style={{ fontSize: 18, fontWeight: 800, color: "#003399", marginBottom: 24 }}>Account Settings</h2>
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <div style={{ padding: 20, borderRadius: 12, backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0" }}>
-                  <p style={{ fontSize: 12, color: "#94A3B8", marginBottom: 4 }}>Full Name</p>
-                  <p style={{ fontSize: 15, fontWeight: 700, color: "#1E293B" }}>{myName}</p>
-                </div>
-                <div style={{ padding: 20, borderRadius: 12, backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0" }}>
-                  <p style={{ fontSize: 12, color: "#94A3B8", marginBottom: 4 }}>Email</p>
-                  <p style={{ fontSize: 15, fontWeight: 700, color: "#1E293B" }}>{user?.email || "—"}</p>
-                </div>
-                <div style={{ padding: 20, borderRadius: 12, backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0" }}>
-                  <p style={{ fontSize: 12, color: "#94A3B8", marginBottom: 4 }}>Department</p>
-                  <p style={{ fontSize: 15, fontWeight: 700, color: "#1E293B" }}>{user?.department || "—"}</p>
-                </div>
-                <div style={{ padding: 20, borderRadius: 12, backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0" }}>
-                  <p style={{ fontSize: 12, color: "#94A3B8", marginBottom: 4 }}>Role</p>
-                  <p style={{ fontSize: 15, fontWeight: 700, color: "#1E293B" }}>ICT Intern</p>
-                </div>
+                {[
+                  { label: "Full Name",   value: myName },
+                  { label: "Email",       value: user?.email || "—" },
+                  { label: "Username",    value: user?.username || "—" },
+                  { label: "Department",  value: user?.department || "—" },
+                  { label: "Role",        value: "ICT Intern" },
+                ].map(row => (
+                  <div key={row.label} style={{ padding: 20, borderRadius: 12, backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+                    <p style={{ fontSize: 12, color: "#94A3B8", marginBottom: 4 }}>{row.label}</p>
+                    <p style={{ fontSize: 15, fontWeight: 700, color: "#1E293B" }}>{row.value}</p>
+                  </div>
+                ))}
                 <button onClick={handleLogout} style={{ padding: "14px 0", borderRadius: 12, border: "none", backgroundColor: "#FFE5E5", color: "#CC0000", fontSize: 14, fontWeight: 700, cursor: "pointer", marginTop: 8 }}>
                   Sign Out
                 </button>
@@ -225,7 +258,7 @@ export default function InternDashboard() {
             </div>
           )}
 
-          {/* Stats — only on dashboard */}
+          {/* Stats — dashboard only */}
           {activeNav === "dashboard" && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, marginBottom: 28 }}>
               {[
@@ -248,7 +281,7 @@ export default function InternDashboard() {
             </div>
           )}
 
-          {/* Ticket table — all nav tabs except settings */}
+          {/* Ticket table */}
           {activeNav !== "settings" && (
             <div style={{ backgroundColor: "white", borderRadius: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", borderBottom: "1px solid #F1F5F9" }}>
@@ -257,9 +290,8 @@ export default function InternDashboard() {
                   {activeNav === "my_tickets" && "Tickets I've Claimed"}
                   {activeNav === "resolved"   && "Resolved Tickets"}
                 </h2>
-                <span style={{ fontSize: 12, color: "#94A3B8", fontWeight: 600 }}>{visibleTickets.length} ticket{visibleTickets.length !== 1 ? "s" : ""}</span>
+                <span style={{ fontSize: 12, color: "#94A3B8", fontWeight: 600 }}>{loading ? "Loading..." : `${visibleTickets.length} ticket(s)`}</span>
               </div>
-
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
@@ -270,7 +302,7 @@ export default function InternDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleTickets.length === 0 && (
+                    {!loading && visibleTickets.length === 0 && (
                       <tr><td colSpan={7} style={{ padding: 48, textAlign: "center", color: "#94A3B8", fontSize: 14 }}>No tickets here.</td></tr>
                     )}
                     {visibleTickets.map((ticket, i) => (
@@ -294,17 +326,17 @@ export default function InternDashboard() {
                         <td style={{ padding: "14px 20px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                             <User size={12} color="#94A3B8" />
-                            <span style={{ fontSize: 13, color: "#64748B" }}>{ticket.submittedBy}</span>
+                            <span style={{ fontSize: 13, color: "#64748B" }}>{ticket.submitted_by_name}</span>
                           </div>
                         </td>
                         <td style={{ padding: "14px 20px" }}>
-                          <span style={{ padding: "4px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700, backgroundColor: priorityStyle[ticket.priority].bg, color: priorityStyle[ticket.priority].color }}>
-                            {priorityStyle[ticket.priority].label}
+                          <span style={{ padding: "4px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700, backgroundColor: priorityStyle[ticket.priority]?.bg, color: priorityStyle[ticket.priority]?.color }}>
+                            {priorityStyle[ticket.priority]?.label}
                           </span>
                         </td>
                         <td style={{ padding: "14px 20px" }}>
-                          <span style={{ padding: "4px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700, backgroundColor: statusStyle[ticket.status].bg, color: statusStyle[ticket.status].color }}>
-                            {statusStyle[ticket.status].label}
+                          <span style={{ padding: "4px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700, backgroundColor: statusStyle[ticket.status]?.bg, color: statusStyle[ticket.status]?.color }}>
+                            {statusStyle[ticket.status]?.label}
                           </span>
                         </td>
                         <td style={{ padding: "14px 20px" }}>
@@ -319,16 +351,16 @@ export default function InternDashboard() {
                                 Claim
                               </motion.button>
                             )}
-                            {ticket.claimedBy === myName && ticket.status !== "resolved" && (
+                            {ticket.claimed_by_name === myName && ticket.status !== "resolved" && ticket.status !== "closed" && (
                               <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => resolveTicket(ticket.id)}
                                 style={{ padding: "5px 12px", borderRadius: 8, border: "none", cursor: "pointer", backgroundColor: "#1A6B3C", color: "white", fontSize: 12, fontWeight: 700 }}>
                                 Resolve
                               </motion.button>
                             )}
-                            {ticket.claimedBy && ticket.claimedBy !== myName && ticket.status !== "resolved" && (
+                            {ticket.claimed_by_name && ticket.claimed_by_name !== myName && ticket.status !== "resolved" && (
                               <span style={{ padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#94A3B8", backgroundColor: "#F1F5F9" }}>Taken</span>
                             )}
-                            {ticket.status === "resolved" && (
+                            {(ticket.status === "resolved" || ticket.status === "closed") && (
                               <span style={{ padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#1A6B3C", backgroundColor: "#E8F5EE" }}>Closed</span>
                             )}
                           </div>
@@ -361,11 +393,11 @@ export default function InternDashboard() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
               {[
                 { label: "Location",     value: viewTicket.location },
-                { label: "Submitted By", value: viewTicket.submittedBy },
-                { label: "Priority",     value: priorityStyle[viewTicket.priority].label },
-                { label: "Status",       value: statusStyle[viewTicket.status].label },
-                { label: "Created",      value: viewTicket.createdAt },
-                { label: "Claimed By",   value: viewTicket.claimedBy || "Unclaimed" },
+                { label: "Submitted By", value: viewTicket.submitted_by_name },
+                { label: "Priority",     value: priorityStyle[viewTicket.priority]?.label },
+                { label: "Status",       value: statusStyle[viewTicket.status]?.label },
+                { label: "Created",      value: new Date(viewTicket.created_at).toLocaleString() },
+                { label: "Claimed By",   value: viewTicket.claimed_by_name || "Unclaimed" },
               ].map(row => (
                 <div key={row.label} style={{ padding: 14, borderRadius: 10, backgroundColor: "#F8FAFC" }}>
                   <p style={{ fontSize: 11, color: "#94A3B8", marginBottom: 4 }}>{row.label}</p>
@@ -380,8 +412,8 @@ export default function InternDashboard() {
                   Claim This Ticket
                 </button>
               )}
-              {viewTicket.claimedBy === myName && viewTicket.status !== "resolved" && (
-                <button onClick={() => { resolveTicket(viewTicket.id); setViewTicket(null); }}
+              {viewTicket.claimed_by_name === myName && viewTicket.status !== "resolved" && viewTicket.status !== "closed" && (
+                <button onClick={() => resolveTicket(viewTicket.id)}
                   style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: "none", backgroundColor: "#1A6B3C", color: "white", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                   Mark as Resolved
                 </button>

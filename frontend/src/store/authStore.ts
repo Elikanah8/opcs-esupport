@@ -1,36 +1,47 @@
 import { create } from "zustand";
 
-type Role = "staff" | "intern";
+export type Role = "staff" | "intern" | "supervisor" | "admin";
 
 export type User = {
-  id: string;
+  id: number;
   name: string;
   email: string;
   username: string;
   role: Role;
   department: string;
-  password: string;
 };
 
 type AuthStore = {
   user: User | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
   error: string;
   setError: (msg: string) => void;
-  register: (data: Omit<User, "id">) => { success: boolean; message: string };
-  login: (username: string, password: string) => { success: boolean; role?: Role; message?: string };
+  login: (username: string, password: string) => Promise<{ success: boolean; role?: Role; message?: string }>;
+  register: (data: {
+    firstName: string;
+    lastName: string;
+    username: string;
+    email: string;
+    password: string;
+    role: "staff" | "intern";
+    department: string;
+  }) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
   rehydrate: () => void;
 };
 
-function getRegistry(): User[] {
-  try {
-    return JSON.parse(localStorage.getItem("opcs_users") || "[]");
-  } catch { return []; }
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+function saveTokens(access: string, refresh: string) {
+  localStorage.setItem("access_token", access);
+  localStorage.setItem("refresh_token", refresh);
 }
 
-function saveRegistry(users: User[]) {
-  localStorage.setItem("opcs_users", JSON.stringify(users));
+function clearTokens() {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  localStorage.removeItem("opcs_current_user");
 }
 
 function getSavedUser(): User | null {
@@ -43,45 +54,114 @@ function getSavedUser(): User | null {
 export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
   isAuthenticated: false,
+  isLoading: false,
   error: "",
-
-  // Call this once on the client to load saved session
-  rehydrate: () => {
-    const saved = getSavedUser();
-    if (saved) set({ user: saved, isAuthenticated: true });
-  },
 
   setError: (msg) => set({ error: msg }),
 
-  register: (data) => {
-    const users = getRegistry();
-    if (users.find(u => u.username.toLowerCase() === data.username.toLowerCase())) {
-      return { success: false, message: "Username already taken. Please choose another." };
+  // Restore session from localStorage on page reload
+  rehydrate: () => {
+    const saved = getSavedUser();
+    const token = localStorage.getItem("access_token");
+    if (saved && token) {
+      set({ user: saved, isAuthenticated: true });
     }
-    if (users.find(u => u.email.toLowerCase() === data.email.toLowerCase())) {
-      return { success: false, message: "An account with this email already exists." };
-    }
-    const newUser: User = { ...data, id: Date.now().toString() };
-    saveRegistry([...users, newUser]);
-    return { success: true, message: "Account created!" };
   },
 
-  login: (username, password) => {
-    const users = getRegistry();
-    const found = users.find(
-      u => u.username.toLowerCase() === username.toLowerCase() && u.password === password
-    );
-    if (!found) {
-      set({ error: "Incorrect username or password." });
-      return { success: false, message: "Incorrect username or password." };
+  login: async (username, password) => {
+    set({ isLoading: true, error: "" });
+    try {
+      // Step 1: Get JWT tokens
+      const tokenRes = await fetch(`${BASE_URL}/api/auth/login/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!tokenRes.ok) {
+        const err = await tokenRes.json().catch(() => ({}));
+        const msg = err?.detail || "Incorrect username or password.";
+        set({ error: msg, isLoading: false });
+        return { success: false, message: msg };
+      }
+
+      const { access, refresh } = await tokenRes.json();
+      saveTokens(access, refresh);
+
+      // Step 2: Fetch user profile
+      const meRes = await fetch(`${BASE_URL}/api/users/me/`, {
+        headers: { Authorization: `Bearer ${access}` },
+      });
+
+      if (!meRes.ok) {
+        clearTokens();
+        set({ error: "Failed to load user profile.", isLoading: false });
+        return { success: false, message: "Failed to load user profile." };
+      }
+
+      const profile = await meRes.json();
+      const user: User = {
+        id: profile.id,
+        name: `${profile.first_name} ${profile.last_name}`.trim() || profile.username,
+        email: profile.email,
+        username: profile.username,
+        role: profile.role as Role,
+        department: profile.department_name || "",
+      };
+
+      localStorage.setItem("opcs_current_user", JSON.stringify(user));
+      set({ user, isAuthenticated: true, isLoading: false, error: "" });
+      return { success: true, role: user.role };
+
+    } catch {
+      const msg = "Could not connect to the server. Is the backend running?";
+      set({ error: msg, isLoading: false });
+      return { success: false, message: msg };
     }
-    localStorage.setItem("opcs_current_user", JSON.stringify(found));
-    set({ user: found, isAuthenticated: true, error: "" });
-    return { success: true, role: found.role };
+  },
+
+  register: async (data) => {
+    set({ isLoading: true, error: "" });
+    try {
+      const res = await fetch(`${BASE_URL}/api/auth/register/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: data.username,
+          email: data.email,
+          first_name: data.firstName,
+          last_name: data.lastName,
+          password: data.password,
+          role: data.role,
+          // department is a string name — backend expects an ID,
+          // so we leave it null here and they set it in profile later
+          // (department lookup requires a separate API call)
+        }),
+      });
+
+      set({ isLoading: false });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const msg =
+          err?.username?.[0] ||
+          err?.email?.[0] ||
+          err?.password?.[0] ||
+          err?.detail ||
+          "Registration failed. Please try again.";
+        return { success: false, message: msg };
+      }
+
+      return { success: true, message: "Account created successfully!" };
+
+    } catch {
+      set({ isLoading: false });
+      return { success: false, message: "Could not connect to the server. Is the backend running?" };
+    }
   },
 
   logout: () => {
-    localStorage.removeItem("opcs_current_user");
+    clearTokens();
     set({ user: null, isAuthenticated: false, error: "" });
   },
 }));
