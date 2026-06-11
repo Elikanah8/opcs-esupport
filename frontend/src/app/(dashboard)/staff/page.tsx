@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import {
   Send, Paperclip, Bot, Shield,
   AlertCircle, LayoutDashboard, ListTodo,
-  LogOut, Settings, Clock, X,
+  LogOut, Settings, Clock, X, Menu,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
@@ -67,59 +67,64 @@ const navItems = [
 ];
 
 // ── SIDEBAR ────────────────────────────────────────────────────────────────
-function Sidebar({ activeNav, setActiveNav, userName, onLogout }: {
+function Sidebar({ activeNav, setActiveNav, userName, onLogout, sidebarOpen, setSidebarOpen }: {
   activeNav: NavTab;
   setActiveNav: (t: NavTab) => void;
   userName: string;
   onLogout: () => void;
+  sidebarOpen: boolean;
+  setSidebarOpen: (o: boolean) => void;
 }) {
   const router = useRouter();
   const initial = userName.charAt(0).toUpperCase();
   return (
-    <aside style={{ width: 240, minWidth: 240, display: "flex", flexDirection: "column", height: "100%", backgroundColor: "#003399" }}>
-      <div style={{ padding: 24, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <img src="/coat-of-arms.jpg" alt="OPCS" style={{ width: 40, height: 40, objectFit: "contain" }} />
-          <div>
-            <p style={{ color: "white", fontWeight: 800, fontSize: 14, lineHeight: 1.3 }}>OPCS eSupport</p>
-            <p style={{ color: "#93C5FD", fontSize: 11 }}>Staff Portal</p>
+    <>
+      <div className={`sidebar-overlay${sidebarOpen ? " open" : ""}`} onClick={() => setSidebarOpen(false)} />
+      <aside className={`dash-sidebar${sidebarOpen ? " open" : ""}`}>
+        <div style={{ padding: 24, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <img src="/coat-of-arms.jpg" alt="OPCS" style={{ width: 40, height: 40, objectFit: "contain" }} />
+            <div>
+              <p style={{ color: "white", fontWeight: 800, fontSize: 14, lineHeight: 1.3 }}>OPCS eSupport</p>
+              <p style={{ color: "#93C5FD", fontSize: 11 }}>Staff Portal</p>
+            </div>
           </div>
         </div>
-      </div>
-      <nav style={{ flex: 1, padding: 16, display: "flex", flexDirection: "column", gap: 4 }}>
-        {navItems.map((item, i) => (
-          <button
-            key={i}
-            onClick={() => router.push(item.href)}
-            style={{
-              display: "flex", alignItems: "center", gap: 12,
-              padding: "12px 16px", borderRadius: 12, border: "none",
-              cursor: "pointer",
-              backgroundColor: item.active ? "rgba(255,255,255,0.15)" : "transparent",
-              color: item.active ? "white" : "rgba(255,255,255,0.55)",
-              fontSize: 14, fontWeight: 600, textAlign: "left", width: "100%",
-            }}
-          >
-            <item.icon size={18} />
-            {item.label}
-          </button>
-        ))}
-      </nav>
-      <div style={{ padding: 16, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: "50%", flexShrink: 0, backgroundColor: "#FFCC00", color: "#003399", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 14 }}>
-            {initial}
+        <nav style={{ flex: 1, padding: 16, display: "flex", flexDirection: "column", gap: 4 }}>
+          {navItems.map((item, i) => (
+            <button
+              key={i}
+              onClick={() => { router.push(item.href); setSidebarOpen(false); }}
+              style={{
+                display: "flex", alignItems: "center", gap: 12,
+                padding: "12px 16px", borderRadius: 12, border: "none",
+                cursor: "pointer",
+                backgroundColor: item.active ? "rgba(255,255,255,0.15)" : "transparent",
+                color: item.active ? "white" : "rgba(255,255,255,0.55)",
+                fontSize: 14, fontWeight: 600, textAlign: "left", width: "100%",
+              }}
+            >
+              <item.icon size={18} />
+              {item.label}
+            </button>
+          ))}
+        </nav>
+        <div style={{ padding: 16, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: "50%", flexShrink: 0, backgroundColor: "#FFCC00", color: "#003399", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 14 }}>
+              {initial}
+            </div>
+            <div style={{ overflow: "hidden", flex: 1 }}>
+              <p style={{ color: "white", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{userName}</p>
+              <p style={{ color: "#93C5FD", fontSize: 11 }}>OPCS Staff</p>
+            </div>
+            <button onClick={onLogout} title="Logout" style={{ background: "none", border: "none", cursor: "pointer", display: "flex", padding: 4 }}>
+              <LogOut size={15} color="#93C5FD" />
+            </button>
           </div>
-          <div style={{ overflow: "hidden", flex: 1 }}>
-            <p style={{ color: "white", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{userName}</p>
-            <p style={{ color: "#93C5FD", fontSize: 11 }}>OPCS Staff</p>
-          </div>
-          <button onClick={onLogout} title="Logout" style={{ background: "none", border: "none", cursor: "pointer", display: "flex", padding: 4 }}>
-            <LogOut size={15} color="#93C5FD" />
-          </button>
         </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }
 
@@ -131,6 +136,7 @@ export default function StaffPortal() {
   const initial  = userName.charAt(0).toUpperCase();
 
   const [activeNav, setActiveNav] = useState<NavTab>("report");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     rehydrate();
@@ -166,7 +172,6 @@ export default function StaffPortal() {
         description: form.description,
         priority:    form.priority,
         location:    form.location,
-        // department ID lookup not required — backend accepts name or null
       });
       setTicketRef(response.data.reference);
       setSubmitted(true);
@@ -184,13 +189,11 @@ export default function StaffPortal() {
     if (!aiQuery.trim()) return;
     const userMsg = aiQuery.trim();
 
-    // Add user message to chat immediately
     setAiMessages(prev => [...prev, { role: "user", text: userMsg }]);
     setAiQuery("");
     setAiLoading(true);
 
     try {
-      // Call our Next.js API route which connects to Grok
       const response = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -203,14 +206,12 @@ export default function StaffPortal() {
         throw new Error(data.error);
       }
 
-      // Add AI response to chat
       setAiMessages(prev => [...prev, {
         role: "ai",
         text: data.reply,
       }]);
 
     } catch (error) {
-      // Show error message in chat if API call fails
       setAiMessages(prev => [...prev, {
         role: "ai",
         text: "I am currently unavailable. Please try again or submit a ticket directly.",
@@ -223,8 +224,8 @@ export default function StaffPortal() {
   // ── SUCCESS SCREEN ──────────────────────────────────────────────────────
   if (submitted) {
     return (
-      <div style={{ display: "flex", height: "100vh", width: "100%", overflow: "hidden", backgroundColor: "#F5F7FA" }}>
-        <Sidebar activeNav={activeNav} setActiveNav={setActiveNav} userName={userName} onLogout={handleLogout} />
+      <div className="dash-layout">
+        <Sidebar activeNav={activeNav} setActiveNav={setActiveNav} userName={userName} onLogout={handleLogout} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }}>
           <motion.div
             initial={{ scale: 0.85, opacity: 0 }}
@@ -289,27 +290,28 @@ export default function StaffPortal() {
 
   // ── MAIN PORTAL ─────────────────────────────────────────────────────────
   return (
-    <div style={{ display: "flex", height: "100vh", width: "100%", overflow: "hidden", backgroundColor: "#F5F7FA" }}>
-      <Sidebar activeNav={activeNav} setActiveNav={setActiveNav} userName={userName} onLogout={handleLogout} />
+    <div className="dash-layout">
+      <Sidebar activeNav={activeNav} setActiveNav={setActiveNav} userName={userName} onLogout={handleLogout} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div className="dash-main">
 
         {/* Header */}
-        <header style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "16px 32px", backgroundColor: "white",
-          borderBottom: "1px solid #E2E8F0", flexShrink: 0,
-        }}>
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 900, color: "#003399" }}>
-              {activeNav === "report"     && "Report an IT Issue"}
-              {activeNav === "my_tickets" && "My Submitted Tickets"}
-              {activeNav === "history"    && "Ticket History"}
-              {activeNav === "settings"   && "Settings"}
-            </h1>
-            <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>
-              {activeNav === "report" ? "Fill in the form — a technician will be assigned to your request" : `Welcome, ${userName}`}
-            </p>
+        <header className="dash-header">
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button className="mob-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu">
+              <Menu size={22} />
+            </button>
+            <div>
+              <h1 style={{ fontSize: 20, fontWeight: 900, color: "#003399" }}>
+                {activeNav === "report"     && "Report an IT Issue"}
+                {activeNav === "my_tickets" && "My Submitted Tickets"}
+                {activeNav === "history"    && "Ticket History"}
+                {activeNav === "settings"   && "Settings"}
+              </h1>
+              <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>
+                {activeNav === "report" ? "Fill in the form — a technician will be assigned to your request" : `Welcome, ${userName}`}
+              </p>
+            </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Shield size={16} color="#EAB308" />
@@ -322,7 +324,7 @@ export default function StaffPortal() {
         <div style={{ width: "100%", height: 4, backgroundColor: "#FFCC00", flexShrink: 0 }} />
 
         {/* Scrollable content */}
-        <main style={{ flex: 1, overflowY: "auto", padding: 32 }}>
+        <main className="dash-content">
 
           {/* Settings view */}
           {activeNav === "settings" && (
@@ -365,7 +367,7 @@ export default function StaffPortal() {
 
           {/* Report Issue form */}
           {activeNav === "report" && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 28, maxWidth: 1400, margin: "0 auto" }}>
+          <div className="report-grid">
 
             {/* ── TICKET FORM ── */}
             <motion.div
@@ -406,7 +408,7 @@ export default function StaffPortal() {
                 </div>
 
                 {/* Department + Location */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div className="two-col">
                   <div>
                     <label style={labelStyle}>Department *</label>
                     <select
@@ -436,7 +438,7 @@ export default function StaffPortal() {
                 {/* Priority */}
                 <div>
                   <label style={labelStyle}>Priority Level *</label>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+                  <div className="priority-grid">
                     {priorities.map(p => (
                       <button
                         key={p.value} type="button"

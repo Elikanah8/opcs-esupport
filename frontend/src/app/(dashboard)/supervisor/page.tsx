@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import {
   TicketIcon, CheckCircle, AlertTriangle,
   LogOut, Bell, LayoutDashboard, Users, BarChart2,
-  Settings, MapPin, User, X, TrendingUp,
+  Settings, MapPin, User, X, TrendingUp, Menu,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -67,6 +67,7 @@ export default function SupervisorDashboard() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notifOpen,     setNotifOpen]     = useState(false);
   const [loading,       setLoading]       = useState(true);
+  const [sidebarOpen,   setSidebarOpen]   = useState(false);
 
   const myName  = user?.name || "Supervisor";
   const initial = myName.charAt(0).toUpperCase();
@@ -118,10 +119,13 @@ export default function SupervisorDashboard() {
   })) || [];
 
   return (
-    <div style={{ display: "flex", height: "100vh", width: "100%", overflow: "hidden", backgroundColor: "#F5F7FA" }}>
+    <div className="dash-layout">
+
+      {/* Overlay */}
+      <div className={`sidebar-overlay${sidebarOpen ? " open" : ""}`} onClick={() => setSidebarOpen(false)} />
 
       {/* SIDEBAR */}
-      <aside style={{ width: 240, minWidth: 240, display: "flex", flexDirection: "column", height: "100%", backgroundColor: "#003399" }}>
+      <aside className={`dash-sidebar${sidebarOpen ? " open" : ""}`}>
         <div style={{ padding: 24, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <img src="/coat-of-arms.jpg" alt="OPCS" style={{ width: 40, height: 40, objectFit: "contain" }} />
@@ -133,7 +137,7 @@ export default function SupervisorDashboard() {
         </div>
         <nav style={{ flex: 1, padding: 16, display: "flex", flexDirection: "column", gap: 4 }}>
           {navItems.map((item, i) => (
-            <button key={i} onClick={() => router.push(item.href)}
+            <button key={i} onClick={() => { router.push(item.href); setSidebarOpen(false); }}
               style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 12, border: "none", cursor: "pointer",
                 backgroundColor: item.href === "/supervisor" ? "rgba(255,255,255,0.15)" : "transparent",
                 color: item.href === "/supervisor" ? "white" : "rgba(255,255,255,0.55)",
@@ -158,13 +162,18 @@ export default function SupervisorDashboard() {
       </aside>
 
       {/* MAIN */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div className="dash-main">
 
         {/* Header */}
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 32px", backgroundColor: "white", borderBottom: "1px solid #E2E8F0", flexShrink: 0 }}>
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 800, color: "#003399" }}>Supervisor Overview</h1>
-            <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>{new Date().toLocaleDateString("en-KE", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} — Real-time dashboard</p>
+        <header className="dash-header">
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button className="mob-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu">
+              <Menu size={22} />
+            </button>
+            <div>
+              <h1 style={{ fontSize: 20, fontWeight: 800, color: "#003399" }}>Supervisor Overview</h1>
+              <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>{new Date().toLocaleDateString("en-KE", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} — Real-time dashboard</p>
+            </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 99, backgroundColor: "#E8F5EE" }}>
@@ -202,10 +211,10 @@ export default function SupervisorDashboard() {
 
         <div style={{ height: 4, backgroundColor: "#FFCC00", flexShrink: 0 }} />
 
-        <main style={{ flex: 1, overflowY: "auto", padding: 32 }}>
+        <main className="dash-content">
 
           {/* STAT CARDS */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, marginBottom: 32 }}>
+          <div className="stat-grid-4">
             {[
               { label: "Open Tickets",    value: analytics?.open_tickets     ?? "—", icon: TicketIcon,    color: "#003399" },
               { label: "Resolved Today",  value: analytics?.resolved_today   ?? "—", icon: CheckCircle,   color: "#1A6B3C" },
@@ -226,7 +235,7 @@ export default function SupervisorDashboard() {
           </div>
 
           {/* CHARTS ROW */}
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 20, marginBottom: 32 }}>
+          <div className="chart-grid">
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
               style={{ backgroundColor: "white", borderRadius: 16, padding: 24, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
               <h3 style={{ fontSize: 15, fontWeight: 800, color: "#003399", marginBottom: 16 }}>Intern Performance (Claimed vs Resolved)</h3>
@@ -268,47 +277,49 @@ export default function SupervisorDashboard() {
             <div style={{ padding: "16px 24px", borderBottom: "1px solid #F1F5F9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <h3 style={{ fontSize: 15, fontWeight: 800, color: "#003399" }}>Intern Performance</h3>
             </div>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ backgroundColor: "#F8FAFC" }}>
-                  {["Intern", "Claimed", "Resolved", "Performance"].map(h => (
-                    <th key={h} style={{ padding: "10px 20px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {!loading && (analytics?.intern_stats || []).length === 0 && (
-                  <tr><td colSpan={4} style={{ padding: 32, textAlign: "center", color: "#94A3B8" }}>No interns have claimed tickets yet.</td></tr>
-                )}
-                {(analytics?.intern_stats || []).map((intern, i) => {
-                  const score = intern.claimed > 0 ? Math.round((intern.resolved / intern.claimed) * 100) : 0;
-                  return (
-                    <tr key={i} style={{ borderTop: "1px solid #F1F5F9" }}
-                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#F8FAFC")}
-                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}>
-                      <td style={{ padding: "14px 20px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <div style={{ width: 34, height: 34, borderRadius: "50%", backgroundColor: "#EBF0FA", color: "#003399", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13 }}>
-                            {intern.name.charAt(0)}
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ backgroundColor: "#F8FAFC" }}>
+                    {["Intern", "Claimed", "Resolved", "Performance"].map(h => (
+                      <th key={h} style={{ padding: "10px 20px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {!loading && (analytics?.intern_stats || []).length === 0 && (
+                    <tr><td colSpan={4} style={{ padding: 32, textAlign: "center", color: "#94A3B8" }}>No interns have claimed tickets yet.</td></tr>
+                  )}
+                  {(analytics?.intern_stats || []).map((intern, i) => {
+                    const score = intern.claimed > 0 ? Math.round((intern.resolved / intern.claimed) * 100) : 0;
+                    return (
+                      <tr key={i} style={{ borderTop: "1px solid #F1F5F9" }}
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#F8FAFC")}
+                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}>
+                        <td style={{ padding: "14px 20px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div style={{ width: 34, height: 34, borderRadius: "50%", backgroundColor: "#EBF0FA", color: "#003399", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13 }}>
+                              {intern.name.charAt(0)}
+                            </div>
+                            <span style={{ fontSize: 14, fontWeight: 600, color: "#1E293B" }}>{intern.name}</span>
                           </div>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: "#1E293B" }}>{intern.name}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: "14px 20px", fontSize: 14, fontWeight: 700, color: "#003399" }}>{intern.claimed}</td>
-                      <td style={{ padding: "14px 20px", fontSize: 14, fontWeight: 700, color: "#1A6B3C" }}>{intern.resolved}</td>
-                      <td style={{ padding: "14px 20px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ flex: 1, height: 8, borderRadius: 99, backgroundColor: "#F1F5F9" }}>
-                            <div style={{ height: "100%", borderRadius: 99, backgroundColor: score >= 80 ? "#1A6B3C" : score >= 60 ? "#FF8C00" : "#CC0000", width: `${score}%`, transition: "width 0.5s ease" }} />
+                        </td>
+                        <td style={{ padding: "14px 20px", fontSize: 14, fontWeight: 700, color: "#003399" }}>{intern.claimed}</td>
+                        <td style={{ padding: "14px 20px", fontSize: 14, fontWeight: 700, color: "#1A6B3C" }}>{intern.resolved}</td>
+                        <td style={{ padding: "14px 20px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ flex: 1, height: 8, borderRadius: 99, backgroundColor: "#F1F5F9" }}>
+                              <div style={{ height: "100%", borderRadius: 99, backgroundColor: score >= 80 ? "#1A6B3C" : score >= 60 ? "#FF8C00" : "#CC0000", width: `${score}%`, transition: "width 0.5s ease" }} />
+                            </div>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: "#64748B", minWidth: 36 }}>{score}%</span>
                           </div>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: "#64748B", minWidth: 36 }}>{score}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </motion.div>
 
           {/* ALL TICKETS TABLE */}

@@ -1,6 +1,7 @@
 "use client";
 
-import { LayoutDashboard, ListTodo, Clock, Settings, LogOut, User, Mail, Building } from "lucide-react";
+import { useState } from "react";
+import { LayoutDashboard, ListTodo, Clock, Settings, LogOut, User, Mail, Building, Menu } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 
@@ -14,6 +15,7 @@ const navItems = [
 export default function StaffSettingsPage() {
   const { user, logout } = useAuthStore();
   const router = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   function handleLogout() {
     logout();
@@ -21,10 +23,12 @@ export default function StaffSettingsPage() {
   }
 
   return (
-    <div style={{ display: "flex", height: "100vh", width: "100%", overflow: "hidden", backgroundColor: "#F5F7FA" }}>
+    <div className="dash-layout">
+      {/* Overlay */}
+      <div className={`sidebar-overlay${sidebarOpen ? " open" : ""}`} onClick={() => setSidebarOpen(false)} />
 
       {/* SIDEBAR */}
-      <aside style={{ width: 240, minWidth: 240, display: "flex", flexDirection: "column", height: "100%", backgroundColor: "#003399" }}>
+      <aside className={`dash-sidebar${sidebarOpen ? " open" : ""}`}>
         <div style={{ padding: 24, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <img src="/coat-of-arms.jpg" alt="OPCS" style={{ width: 40, height: 40, objectFit: "contain" }} />
@@ -39,7 +43,7 @@ export default function StaffSettingsPage() {
           {navItems.map((item, i) => (
             <button
               key={i}
-              onClick={() => router.push(item.href)}
+              onClick={() => { router.push(item.href); setSidebarOpen(false); }}
               style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 12, border: "none", cursor: "pointer", backgroundColor: item.href === "/staff/settings" ? "rgba(255,255,255,0.15)" : "transparent", color: item.href === "/staff/settings" ? "white" : "rgba(255,255,255,0.55)", fontSize: 14, fontWeight: 600, textAlign: "left", width: "100%" }}
             >
               <item.icon size={18} />
@@ -63,17 +67,22 @@ export default function StaffSettingsPage() {
       </aside>
 
       {/* MAIN CONTENT */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 32px", backgroundColor: "white", borderBottom: "1px solid #E2E8F0", flexShrink: 0 }}>
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 800, color: "#003399" }}>Settings</h1>
-            <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Manage your account details</p>
+      <div className="dash-main">
+        <header className="dash-header">
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button className="mob-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu">
+              <Menu size={22} />
+            </button>
+            <div>
+              <h1 style={{ fontSize: 20, fontWeight: 800, color: "#003399" }}>Settings</h1>
+              <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Manage your account details</p>
+            </div>
           </div>
         </header>
 
         <div style={{ height: 4, backgroundColor: "#FFCC00", flexShrink: 0 }} />
 
-        <main style={{ flex: 1, overflowY: "auto", padding: 32 }}>
+        <main className="dash-content">
           <div style={{ maxWidth: 600 }}>
 
             {/* Profile card */}

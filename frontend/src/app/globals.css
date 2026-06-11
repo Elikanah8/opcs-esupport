@@ -49,3 +49,232 @@ html { scroll-behavior: smooth; }
 
 .animate-fadeInUp    { animation: fadeInUp    0.5s ease forwards; }
 .animate-slideInLeft { animation: slideInLeft 0.5s ease forwards; }
+
+/* ─── RESPONSIVE LAYOUT UTILITIES ──────────────────────────────────────── */
+
+/* Root dashboard wrapper */
+.dash-layout {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background-color: #F5F7FA;
+  position: relative;
+}
+
+/* Sidebar */
+.dash-sidebar {
+  width: 240px;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #003399;
+  transition: transform 0.3s ease;
+  z-index: 200;
+  flex-shrink: 0;
+}
+
+/* Hamburger toggle — hidden on desktop */
+.mob-toggle {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  color: #003399;
+  font-size: 22px;
+  line-height: 1;
+  margin-right: 8px;
+}
+
+/* Dark overlay behind sidebar on mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 199;
+}
+
+/* Stat card grids */
+.stat-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.stat-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+/* Two-column chart layout */
+.chart-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+/* Two equal chart columns (analytics) */
+.chart-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+/* Report Issue: form + AI panel side by side */
+.report-grid {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 28px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Priority selector inside form */
+.priority-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+/* Department + Location 2-col */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Main scrollable content area */
+.dash-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* Responsive header padding */
+.dash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px;
+  background-color: white;
+  border-bottom: 1px solid #E2E8F0;
+  flex-shrink: 0;
+}
+
+/* Main content padding */
+.dash-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px;
+}
+
+/* ─── TABLET (≤ 1024px) ─────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .stat-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .report-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .priority-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .dash-header {
+    padding: 14px 20px;
+  }
+
+  .dash-content {
+    padding: 20px;
+  }
+}
+
+/* ─── MOBILE (≤ 768px) ──────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Show hamburger button */
+  .mob-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Sidebar becomes a slide-in drawer */
+  .dash-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    transform: translateX(-100%);
+  }
+
+  .dash-sidebar.open {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.25);
+  }
+
+  /* Show overlay when sidebar open */
+  .sidebar-overlay.open {
+    display: block;
+  }
+
+  .stat-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .stat-grid-3 {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .chart-grid,
+  .chart-grid-2,
+  .report-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .priority-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .dash-header {
+    padding: 12px 16px;
+  }
+
+  .dash-content {
+    padding: 16px;
+  }
+}
+
+/* ─── VERY SMALL (≤ 480px) ───────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .stat-grid-4 {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+}

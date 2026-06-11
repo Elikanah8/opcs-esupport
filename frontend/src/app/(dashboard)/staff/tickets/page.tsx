@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard, ListTodo, Clock,
-  Settings, LogOut, MapPin
+  Settings, LogOut, MapPin, Menu
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
@@ -53,6 +53,7 @@ export default function MyTicketsPage() {
   const [loading, setLoading] = useState(true);
   const { user, logout } = useAuthStore();
   const router = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     async function fetchMyTickets() {
@@ -74,10 +75,12 @@ export default function MyTicketsPage() {
   }
 
   return (
-    <div style={{ display: "flex", height: "100vh", width: "100%", overflow: "hidden", backgroundColor: "#F5F7FA" }}>
+    <div className="dash-layout">
+      {/* Overlay */}
+      <div className={`sidebar-overlay${sidebarOpen ? " open" : ""}`} onClick={() => setSidebarOpen(false)} />
 
       {/* SIDEBAR */}
-      <aside style={{ width: 240, minWidth: 240, display: "flex", flexDirection: "column", height: "100%", backgroundColor: "#003399" }}>
+      <aside className={`dash-sidebar${sidebarOpen ? " open" : ""}`}>
         <div style={{ padding: 24, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <img src="/coat-of-arms.jpg" alt="OPCS" style={{ width: 40, height: 40, objectFit: "contain" }} />
@@ -92,7 +95,7 @@ export default function MyTicketsPage() {
           {navItems.map((item, i) => (
             <button
               key={i}
-              onClick={() => router.push(item.href)}
+              onClick={() => { router.push(item.href); setSidebarOpen(false); }}
               style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 12, border: "none", cursor: "pointer", backgroundColor: item.href === "/staff/tickets" ? "rgba(255,255,255,0.15)" : "transparent", color: item.href === "/staff/tickets" ? "white" : "rgba(255,255,255,0.55)", fontSize: 14, fontWeight: 600, textAlign: "left", width: "100%" }}
             >
               <item.icon size={18} />
@@ -116,17 +119,22 @@ export default function MyTicketsPage() {
       </aside>
 
       {/* MAIN CONTENT */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 32px", backgroundColor: "white", borderBottom: "1px solid #E2E8F0", flexShrink: 0 }}>
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 800, color: "#003399" }}>My Tickets</h1>
-            <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>All IT issues you have reported</p>
+      <div className="dash-main">
+        <header className="dash-header">
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button className="mob-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu">
+              <Menu size={22} />
+            </button>
+            <div>
+              <h1 style={{ fontSize: 20, fontWeight: 800, color: "#003399" }}>My Tickets</h1>
+              <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>All IT issues you have reported</p>
+            </div>
           </div>
         </header>
 
         <div style={{ height: 4, backgroundColor: "#FFCC00", flexShrink: 0 }} />
 
-        <main style={{ flex: 1, overflowY: "auto", padding: 32 }}>
+        <main className="dash-content">
           <div style={{ backgroundColor: "white", borderRadius: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", overflow: "hidden" }}>
             <div style={{ overflowX: "auto" }}>
               {loading ? (

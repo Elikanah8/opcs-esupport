@@ -1,6 +1,7 @@
 "use client";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutDashboard, ListTodo, CheckCircle, Settings, LogOut, User, Mail, Building, Key } from "lucide-react";
+import { LayoutDashboard, ListTodo, CheckCircle, Settings, LogOut, User, Mail, Building, Key, Menu } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 
 const nav = [ {icon:LayoutDashboard,label:"Dashboard",href:"/intern"}, {icon:ListTodo,label:"My Tickets",href:"/intern/tickets"}, {icon:CheckCircle,label:"Resolved",href:"/intern/resolved"}, {icon:Settings,label:"Settings",href:"/intern/settings"} ];
@@ -8,11 +9,16 @@ const nav = [ {icon:LayoutDashboard,label:"Dashboard",href:"/intern"}, {icon:Lis
 export default function InternSettingsPage() {
   const { user, logout } = useAuthStore();
   const router = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const myName = user?.name || "Intern";
 
   return (
-    <div style={{display:"flex",height:"100vh",width:"100%",overflow:"hidden",backgroundColor:"#F5F7FA"}}>
-      <aside style={{width:240,minWidth:240,display:"flex",flexDirection:"column",height:"100%",backgroundColor:"#003399"}}>
+    <div className="dash-layout">
+      {/* Overlay */}
+      <div className={`sidebar-overlay${sidebarOpen ? " open" : ""}`} onClick={() => setSidebarOpen(false)} />
+
+      {/* SIDEBAR */}
+      <aside className={`dash-sidebar${sidebarOpen ? " open" : ""}`}>
         <div style={{padding:24,borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
             <img src="/coat-of-arms.jpg" alt="OPCS" style={{width:40,height:40,objectFit:"contain"}} />
@@ -21,7 +27,7 @@ export default function InternSettingsPage() {
         </div>
         <nav style={{flex:1,padding:16,display:"flex",flexDirection:"column",gap:4}}>
           {nav.map((item,i) => (
-            <button key={i} onClick={() => router.push(item.href)}
+            <button key={i} onClick={() => { router.push(item.href); setSidebarOpen(false); }}
               style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderRadius:12,border:"none",cursor:"pointer",
                 backgroundColor:item.href==="/intern/settings"?"rgba(255,255,255,0.15)":"transparent",
                 color:item.href==="/intern/settings"?"white":"rgba(255,255,255,0.55)",
@@ -39,13 +45,20 @@ export default function InternSettingsPage() {
         </div>
       </aside>
 
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <header style={{padding:"16px 32px",backgroundColor:"white",borderBottom:"1px solid #E2E8F0",flexShrink:0}}>
-          <h1 style={{fontSize:20,fontWeight:800,color:"#003399"}}>Settings</h1>
-          <p style={{fontSize:12,color:"#94A3B8",marginTop:2}}>Your account information</p>
+      <div className="dash-main">
+        <header className="dash-header">
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button className="mob-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu">
+              <Menu size={22} />
+            </button>
+            <div>
+              <h1 style={{fontSize:20,fontWeight:800,color:"#003399"}}>Settings</h1>
+              <p style={{fontSize:12,color:"#94A3B8",marginTop:2}}>Your account information</p>
+            </div>
+          </div>
         </header>
         <div style={{height:4,backgroundColor:"#FFCC00",flexShrink:0}} />
-        <main style={{flex:1,overflowY:"auto",padding:32}}>
+        <main className="dash-content">
           <div style={{maxWidth:580}}>
 
             {/* Profile card */}

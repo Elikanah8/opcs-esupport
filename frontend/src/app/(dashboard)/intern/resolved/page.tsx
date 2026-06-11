@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { LayoutDashboard, ListTodo, CheckCircle, Settings, LogOut, MapPin, User } from "lucide-react";
+import { LayoutDashboard, ListTodo, CheckCircle, Settings, LogOut, MapPin, User, Menu } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import api from "@/lib/api";
 
@@ -18,6 +18,7 @@ export default function InternResolvedPage() {
   const router = useRouter();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const myName = user?.name || "Intern";
 
   const fetch = useCallback(async () => {
@@ -28,8 +29,12 @@ export default function InternResolvedPage() {
   useEffect(() => { fetch(); }, [fetch]);
 
   return (
-    <div style={{display:"flex",height:"100vh",width:"100%",overflow:"hidden",backgroundColor:"#F5F7FA"}}>
-      <aside style={{width:240,minWidth:240,display:"flex",flexDirection:"column",height:"100%",backgroundColor:"#003399"}}>
+    <div className="dash-layout">
+      {/* Overlay */}
+      <div className={`sidebar-overlay${sidebarOpen ? " open" : ""}`} onClick={() => setSidebarOpen(false)} />
+
+      {/* SIDEBAR */}
+      <aside className={`dash-sidebar${sidebarOpen ? " open" : ""}`}>
         <div style={{padding:24,borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
             <img src="/coat-of-arms.jpg" alt="OPCS" style={{width:40,height:40,objectFit:"contain"}} />
@@ -38,7 +43,7 @@ export default function InternResolvedPage() {
         </div>
         <nav style={{flex:1,padding:16,display:"flex",flexDirection:"column",gap:4}}>
           {nav.map((item,i) => (
-            <button key={i} onClick={() => router.push(item.href)}
+            <button key={i} onClick={() => { router.push(item.href); setSidebarOpen(false); }}
               style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderRadius:12,border:"none",cursor:"pointer",
                 backgroundColor:item.href==="/intern/resolved"?"rgba(255,255,255,0.15)":"transparent",
                 color:item.href==="/intern/resolved"?"white":"rgba(255,255,255,0.55)",
@@ -56,16 +61,23 @@ export default function InternResolvedPage() {
         </div>
       </aside>
 
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <header style={{padding:"16px 32px",backgroundColor:"white",borderBottom:"1px solid #E2E8F0",flexShrink:0}}>
-          <h1 style={{fontSize:20,fontWeight:800,color:"#003399"}}>Resolved Tickets</h1>
-          <p style={{fontSize:12,color:"#94A3B8",marginTop:2}}>Tickets that have been successfully resolved</p>
+      <div className="dash-main">
+        <header className="dash-header">
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button className="mob-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu">
+              <Menu size={22} />
+            </button>
+            <div>
+              <h1 style={{fontSize:20,fontWeight:800,color:"#003399"}}>Resolved Tickets</h1>
+              <p style={{fontSize:12,color:"#94A3B8",marginTop:2}}>Tickets that have been successfully resolved</p>
+            </div>
+          </div>
         </header>
         <div style={{height:4,backgroundColor:"#FFCC00",flexShrink:0}} />
-        <main style={{flex:1,overflowY:"auto",padding:32}}>
+        <main className="dash-content">
 
           {/* Stats */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,marginBottom:24}}>
+          <div className="stat-grid-3">
             {[{label:"Total Resolved",value:tickets.length,color:"#1A6B3C"},{label:"Resolved by Me",value:tickets.filter(t=>t.claimed_by_name===myName).length,color:"#003399"},{label:"Closed",value:tickets.filter(t=>t.status==="closed").length,color:"#64748B"}].map((s,i) => (
               <motion.div key={i} initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} transition={{delay:i*0.07}}
                 style={{backgroundColor:"white",borderRadius:14,padding:"20px 24px",boxShadow:"0 2px 10px rgba(0,0,0,0.06)",borderLeft:`4px solid ${s.color}`}}>

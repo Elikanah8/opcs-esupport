@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { LayoutDashboard, TicketIcon, Users, BarChart2, Settings, LogOut, MapPin, User } from "lucide-react";
+import { LayoutDashboard, TicketIcon, Users, BarChart2, Settings, LogOut, MapPin, User, Menu } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import api from "@/lib/api";
 
@@ -50,6 +50,7 @@ export default function SupervisorTicketsPage() {
   const [loading,       setLoading]       = useState(true);
   const [filterStatus,  setFilterStatus]  = useState<FilterStatus>("all");
   const [filterPriority, setFilterPriority] = useState<"all" | Priority>("all");
+  const [sidebarOpen,   setSidebarOpen]   = useState(false);
 
   const myName  = user?.name || "Supervisor";
   const initial = myName.charAt(0).toUpperCase();
@@ -78,10 +79,12 @@ export default function SupervisorTicketsPage() {
   };
 
   return (
-    <div style={{ display: "flex", height: "100vh", width: "100%", overflow: "hidden", backgroundColor: "#F5F7FA" }}>
+    <div className="dash-layout">
+      {/* Overlay */}
+      <div className={`sidebar-overlay${sidebarOpen ? " open" : ""}`} onClick={() => setSidebarOpen(false)} />
 
       {/* SIDEBAR */}
-      <aside style={{ width: 240, minWidth: 240, display: "flex", flexDirection: "column", height: "100%", backgroundColor: "#003399" }}>
+      <aside className={`dash-sidebar${sidebarOpen ? " open" : ""}`}>
         <div style={{ padding: 24, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <img src="/coat-of-arms.jpg" alt="OPCS" style={{ width: 40, height: 40, objectFit: "contain" }} />
@@ -93,7 +96,7 @@ export default function SupervisorTicketsPage() {
         </div>
         <nav style={{ flex: 1, padding: 16, display: "flex", flexDirection: "column", gap: 4 }}>
           {navItems.map((item, i) => (
-            <button key={i} onClick={() => router.push(item.href)}
+            <button key={i} onClick={() => { router.push(item.href); setSidebarOpen(false); }}
               style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 12, border: "none", cursor: "pointer",
                 backgroundColor: item.href === "/supervisor/tickets" ? "rgba(255,255,255,0.15)" : "transparent",
                 color: item.href === "/supervisor/tickets" ? "white" : "rgba(255,255,255,0.55)",
@@ -118,11 +121,16 @@ export default function SupervisorTicketsPage() {
       </aside>
 
       {/* MAIN */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 32px", backgroundColor: "white", borderBottom: "1px solid #E2E8F0", flexShrink: 0 }}>
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 800, color: "#003399" }}>All Tickets</h1>
-            <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Full view of every ticket in the system</p>
+      <div className="dash-main">
+        <header className="dash-header">
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button className="mob-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu">
+              <Menu size={22} />
+            </button>
+            <div>
+              <h1 style={{ fontSize: 20, fontWeight: 800, color: "#003399" }}>All Tickets</h1>
+              <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Full view of every ticket in the system</p>
+            </div>
           </div>
           <div style={{ display: "flex", gap: 12 }}>
             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as FilterStatus)} style={sel}>
@@ -146,7 +154,7 @@ export default function SupervisorTicketsPage() {
 
         <div style={{ height: 4, backgroundColor: "#FFCC00", flexShrink: 0 }} />
 
-        <main style={{ flex: 1, overflowY: "auto", padding: 32 }}>
+        <main className="dash-content">
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             style={{ backgroundColor: "white", borderRadius: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", overflow: "hidden" }}>
             <div style={{ padding: "14px 24px", borderBottom: "1px solid #F1F5F9" }}>

@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import {
   TicketIcon, CheckCircle, AlertTriangle, Clock,
   LogOut, Bell, Wifi, LayoutDashboard,
-  ListTodo, Settings, MapPin, User, X,
+  ListTodo, Settings, MapPin, User, X, Menu,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import api from "@/lib/api";
@@ -58,6 +58,7 @@ export default function InternDashboard() {
   const [notifOpen,     setNotifOpen]     = useState(false);
   const [viewTicket,    setViewTicket]    = useState<TicketItem | null>(null);
   const [actionError,   setActionError]   = useState("");
+  const [sidebarOpen,   setSidebarOpen]   = useState(false);
 
   const myName = user?.name || "Intern";
   const initial = myName.charAt(0).toUpperCase();
@@ -84,7 +85,6 @@ export default function InternDashboard() {
     fetchNotifications();
   }, [fetchTickets, fetchNotifications]);
 
-  // Real-time: refresh when any ticket event fires from another user
   useWebSocket("/ws/tickets/", () => { fetchTickets(); fetchNotifications(); });
 
   function handleLogout() { logout(); router.push("/login"); }
@@ -132,10 +132,13 @@ export default function InternDashboard() {
   })();
 
   return (
-    <div style={{ display: "flex", height: "100vh", width: "100%", overflow: "hidden", backgroundColor: "#F5F7FA" }}>
+    <div className="dash-layout">
+
+      {/* Overlay */}
+      <div className={`sidebar-overlay${sidebarOpen ? " open" : ""}`} onClick={() => setSidebarOpen(false)} />
 
       {/* SIDEBAR */}
-      <aside style={{ width: 240, minWidth: 240, display: "flex", flexDirection: "column", height: "100%", backgroundColor: "#003399" }}>
+      <aside className={`dash-sidebar${sidebarOpen ? " open" : ""}`}>
         <div style={{ padding: 24, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <img src="/coat-of-arms.jpg" alt="OPCS" style={{ width: 40, height: 40, objectFit: "contain" }} />
@@ -147,7 +150,7 @@ export default function InternDashboard() {
         </div>
         <nav style={{ flex: 1, padding: 16, display: "flex", flexDirection: "column", gap: 4 }}>
           {navItems.map((item, i) => (
-            <button key={i} onClick={() => router.push(item.href)}
+            <button key={i} onClick={() => { router.push(item.href); setSidebarOpen(false); }}
               style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 12, border: "none", cursor: "pointer",
                 backgroundColor: item.href === "/intern" ? "rgba(255,255,255,0.15)" : "transparent",
                 color: item.href === "/intern" ? "white" : "rgba(255,255,255,0.55)",
@@ -174,18 +177,23 @@ export default function InternDashboard() {
       </aside>
 
       {/* MAIN */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div className="dash-main">
 
         {/* Header */}
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 32px", backgroundColor: "white", borderBottom: "1px solid #E2E8F0", flexShrink: 0 }}>
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 900, color: "#003399" }}>
-              {activeNav === "dashboard"  && "Intern Dashboard"}
-              {activeNav === "my_tickets" && "My Claimed Tickets"}
-              {activeNav === "resolved"   && "Resolved Tickets"}
-              {activeNav === "settings"   && "Settings"}
-            </h1>
-            <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Welcome, {myName}</p>
+        <header className="dash-header">
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button className="mob-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu">
+              <Menu size={22} />
+            </button>
+            <div>
+              <h1 style={{ fontSize: 20, fontWeight: 900, color: "#003399" }}>
+                {activeNav === "dashboard"  && "Intern Dashboard"}
+                {activeNav === "my_tickets" && "My Claimed Tickets"}
+                {activeNav === "resolved"   && "Resolved Tickets"}
+                {activeNav === "settings"   && "Settings"}
+              </h1>
+              <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Welcome, {myName}</p>
+            </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 99, backgroundColor: "#E8F5EE" }}>
@@ -226,7 +234,7 @@ export default function InternDashboard() {
 
         <div style={{ height: 4, backgroundColor: "#FFCC00", flexShrink: 0 }} />
 
-        <main style={{ flex: 1, overflowY: "auto", padding: 32 }}>
+        <main className="dash-content">
 
           {actionError && (
             <div style={{ padding: "12px 16px", borderRadius: 10, backgroundColor: "#FFE5E5", color: "#CC0000", fontSize: 13, fontWeight: 600, marginBottom: 20 }}>
@@ -260,7 +268,7 @@ export default function InternDashboard() {
 
           {/* Stats — dashboard only */}
           {activeNav === "dashboard" && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, marginBottom: 28 }}>
+            <div className="stat-grid-4">
               {[
                 { label: "Open Tickets",   value: openCount,     icon: TicketIcon,    color: "#003399" },
                 { label: "My Claimed",     value: claimedCount,  icon: CheckCircle,   color: "#1A6B3C" },
@@ -297,7 +305,7 @@ export default function InternDashboard() {
                   <thead>
                     <tr style={{ backgroundColor: "#F8FAFC" }}>
                       {["Reference", "Title", "Location", "Submitted By", "Priority", "Status", "Actions"].map(h => (
-                        <th key={h} style={{ padding: "10px 20px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                        <th key={h} style={{ padding: "10px 20px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -340,7 +348,7 @@ export default function InternDashboard() {
                           </span>
                         </td>
                         <td style={{ padding: "14px 20px" }}>
-                          <div style={{ display: "flex", gap: 8 }}>
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                             <button onClick={() => setViewTicket(ticket)}
                               style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #E2E8F0", backgroundColor: "white", color: "#64748B", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                               View
@@ -405,7 +413,7 @@ export default function InternDashboard() {
                 </div>
               ))}
             </div>
-            <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               {viewTicket.status === "submitted" && (
                 <button onClick={() => { claimTicket(viewTicket.id); setViewTicket(null); }}
                   style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: "none", backgroundColor: "#003399", color: "white", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>

@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { LayoutDashboard, TicketIcon, Users, BarChart2, Settings, LogOut, UserCheck, AlertCircle } from "lucide-react";
+import { LayoutDashboard, TicketIcon, Users, BarChart2, Settings, LogOut, UserCheck, AlertCircle, Menu } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import api from "@/lib/api";
 
@@ -22,6 +22,7 @@ export default function SupervisorTeamPage() {
   const router = useRouter();
   const [analytics, setAnalytics] = useState<Analytics|null>(null);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const myName = user?.name || "Supervisor";
 
   const fetchData = useCallback(async () => {
@@ -36,10 +37,12 @@ export default function SupervisorTeamPage() {
   const totalResolved = interns.reduce((a, i) => a + i.resolved, 0);
 
   return (
-    <div style={{display:"flex",height:"100vh",width:"100%",overflow:"hidden",backgroundColor:"#F5F7FA"}}>
+    <div className="dash-layout">
+      {/* Overlay */}
+      <div className={`sidebar-overlay${sidebarOpen ? " open" : ""}`} onClick={() => setSidebarOpen(false)} />
 
       {/* SIDEBAR */}
-      <aside style={{width:240,minWidth:240,display:"flex",flexDirection:"column",height:"100%",backgroundColor:"#003399"}}>
+      <aside className={`dash-sidebar${sidebarOpen ? " open" : ""}`}>
         <div style={{padding:24,borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
             <img src="/coat-of-arms.jpg" alt="OPCS" style={{width:40,height:40,objectFit:"contain"}} />
@@ -48,7 +51,7 @@ export default function SupervisorTeamPage() {
         </div>
         <nav style={{flex:1,padding:16,display:"flex",flexDirection:"column",gap:4}}>
           {nav.map((item,i) => (
-            <button key={i} onClick={() => router.push(item.href)}
+            <button key={i} onClick={() => { router.push(item.href); setSidebarOpen(false); }}
               style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderRadius:12,border:"none",cursor:"pointer",
                 backgroundColor:item.href==="/supervisor/team"?"rgba(255,255,255,0.15)":"transparent",
                 color:item.href==="/supervisor/team"?"white":"rgba(255,255,255,0.55)",
@@ -67,11 +70,16 @@ export default function SupervisorTeamPage() {
       </aside>
 
       {/* MAIN */}
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <header style={{padding:"16px 32px",backgroundColor:"white",borderBottom:"1px solid #E2E8F0",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <div>
-            <h1 style={{fontSize:20,fontWeight:800,color:"#003399"}}>Intern Team</h1>
-            <p style={{fontSize:12,color:"#94A3B8",marginTop:2}}>Performance overview of all ICT interns</p>
+      <div className="dash-main">
+        <header className="dash-header">
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button className="mob-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu">
+              <Menu size={22} />
+            </button>
+            <div>
+              <h1 style={{fontSize:20,fontWeight:800,color:"#003399"}}>Intern Team</h1>
+              <p style={{fontSize:12,color:"#94A3B8",marginTop:2}}>Performance overview of all ICT interns</p>
+            </div>
           </div>
           <button onClick={() => fetchData()} style={{padding:"8px 18px",borderRadius:10,border:"1.5px solid #E2E8F0",backgroundColor:"white",color:"#003399",fontSize:13,fontWeight:700,cursor:"pointer"}}>
             ↻ Refresh
@@ -79,10 +87,10 @@ export default function SupervisorTeamPage() {
         </header>
         <div style={{height:4,backgroundColor:"#FFCC00",flexShrink:0}} />
 
-        <main style={{flex:1,overflowY:"auto",padding:32}}>
+        <main className="dash-content">
 
           {/* Team Summary Cards */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,marginBottom:28}}>
+          <div className="stat-grid-3">
             {[
               {label:"Total Interns",   value:interns.length,  color:"#003399", icon:Users},
               {label:"Tickets Claimed", value:totalClaimed,    color:"#FF8C00", icon:TicketIcon},
