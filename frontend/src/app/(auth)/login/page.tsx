@@ -110,11 +110,11 @@ export default function LoginPage() {
   const displayError = localError || error;
 
   return (
-    <div style={{ display: "flex", width: "100%", minHeight: "100vh", backgroundColor: "#003399" }}>
+    <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", width: "100%", minHeight: "100vh", backgroundColor: "#003399" }}>
 
       {/* LEFT — branding */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8 }}
-        style={{ width: "50%", minWidth: 420, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", padding: 64, backgroundColor: "#003399" }}>
+        style={{ width: "50%", minWidth: 300, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", padding: 64, backgroundColor: "#003399" }}>
 
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", marginTop: 48 }}>
           <motion.img initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.3, duration: 0.6 }}
@@ -144,7 +144,7 @@ export default function LoginPage() {
 
       {/* RIGHT — form */}
       <motion.div initial={{ x: 60, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ duration: 0.6 }}
-        style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 64px", backgroundColor: "#F5F7FA", overflowY: "auto" }}>
+        style={{ flex: 1, minWidth: 320, display: "flex", alignItems: "center", justifyContent: "center", padding: 32, backgroundColor: "#F5F7FA", overflowY: "auto" }}>
 
         <div style={{ width: "100%", maxWidth: 520 }}>
 
