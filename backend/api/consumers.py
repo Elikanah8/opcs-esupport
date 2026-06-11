@@ -1,6 +1,11 @@
 import json
-from channels.generic.websocket import AsyncWebsocketConsumer
 
+try:
+    from channels.generic.websocket import AsyncWebsocketConsumer
+    CHANNELS_AVAILABLE = True
+except ImportError:
+    CHANNELS_AVAILABLE = False
+    AsyncWebsocketConsumer = object
 
 class TicketConsumer(AsyncWebsocketConsumer):
     """
@@ -16,10 +21,8 @@ class TicketConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(self.GROUP_NAME, self.channel_name)
 
-    # Receive message from WebSocket client (not used — server pushes only)
-    async def receive(self, text_data=None, bytes_data=None):
+    async def receive(self, text_data):
         pass
 
-    # Called by views via channel_layer.group_send — broadcasts to all clients
     async def ticket_update(self, event):
         await self.send(text_data=json.dumps(event["data"]))

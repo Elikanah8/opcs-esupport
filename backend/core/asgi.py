@@ -2,18 +2,23 @@ import os
 from django.core.asgi import get_asgi_application
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
+
 django_asgi_app = get_asgi_application()
 
-from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.auth import AuthMiddlewareStack
-from django.urls import path
-from api.consumers import TicketConsumer
+try:
+    from channels.routing import ProtocolTypeRouter, URLRouter
+    from channels.auth import AuthMiddlewareStack
+    from django.urls import path
+    from api.consumers import TicketConsumer
 
-application = ProtocolTypeRouter({
-    'http': django_asgi_app,
-    'websocket': AuthMiddlewareStack(
-        URLRouter([
-            path('ws/tickets/', TicketConsumer.as_asgi()),
-        ])
-    ),
-})
+    application = ProtocolTypeRouter({
+        'http': django_asgi_app,
+        'websocket': AuthMiddlewareStack(
+            URLRouter([
+                path('ws/tickets/', TicketConsumer.as_asgi()),
+            ])
+        ),
+    })
+except Exception:
+    # Fallback to HTTP only if channels fails
+    application = django_asgi_app
