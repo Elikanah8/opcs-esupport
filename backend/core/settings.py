@@ -90,18 +90,9 @@ REST_FRAMEWORK = {
 
 # Allow requests from Next.js frontend (local dev + Vercel production/preview)
 # Allow requests from Next.js frontend (local dev + Vercel production)
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'https://opcs-esupport-ainslyv52-elikanah-njurus-projects.vercel.app',
-]
-
-# Covers all Vercel preview deployments automatically
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://.*\.vercel\.app$",
-]
-
+# Allow all origins temporarily to fix CORS
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
-
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',
